@@ -64,6 +64,15 @@ type EnvConfig struct {
 	APIKey     string
 }
 
+// MCPConfig holds configuration for the MCP server
+type MCPConfig struct {
+	APIKey    string
+	BaseURL   string
+	Transport string
+	Port      string
+	Verbose   bool
+}
+
 // loadEnvConfig reads environment variables
 func loadEnvConfig() (EnvConfig, error) {
 	cfg := EnvConfig{
@@ -117,5 +126,27 @@ func validateEffort(effort string) string {
 		return defaultEffort
 	default:
 		return defaultEffort
+	}
+}
+
+// parseMCPConfig creates MCPConfig from environment and command line flags
+func parseMCPConfig(apiKey, baseURL, transport, port string, verbose bool) MCPConfig {
+	// Use defaults if not provided
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+	if transport == "" {
+		transport = "stdio"
+	}
+	if port == "" {
+		port = "8080"
+	}
+
+	return MCPConfig{
+		APIKey:    apiKey,
+		BaseURL:   baseURL,
+		Transport: transport,
+		Port:      port,
+		Verbose:   verbose,
 	}
 }

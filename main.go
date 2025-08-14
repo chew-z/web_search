@@ -14,12 +14,68 @@ import (
 func main() {
 	// Check if this is MCP server mode
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
-		RunMCPServer()
+		runMCPMode()
 		return
 	}
 
 	// Original CLI mode
 	runCLI()
+}
+
+func runMCPMode() {
+	// Create a new flag set for MCP subcommand
+	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
+
+	var (
+		transport = mcpFlags.String("t", "stdio", "Transport type (stdio or http)")
+		port      = mcpFlags.String("port", "8080", "HTTP server port")
+		baseURL   = mcpFlags.String("base", defaultBaseURL, "API base URL")
+		verbose   = mcpFlags.Bool("verbose", false, "Enable verbose logging")
+	)
+
+	// Also support long form for transport
+	transportLong := mcpFlags.String("transport", "", "Transport type (overrides -t)")
+
+	// Parse MCP-specific flags (skip "answer mcp" args)
+	if err := mcpFlags.Parse(os.Args[2:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Use long form if provided
+	if *transportLong != "" {
+		*transport = *transportLong
+	}
+
+	// Load environment config
+	envCfg, err := loadEnvConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create server configuration using the config helper
+	cfg := parseMCPConfig(envCfg.APIKey, *baseURL, *transport, *port, *verbose)
+
+	// Create and run MCP server
+	mcpServer := NewMCPServer(cfg)
+
+	// Run with appropriate transport
+	switch cfg.Transport {
+	case "stdio":
+		if err := RunStdioTransport(mcpServer); err != nil {
+			fmt.Fprintf(os.Stderr, "STDIO transport error: %v\n", err)
+			os.Exit(1)
+		}
+	case "http":
+		if err := RunHTTPTransport(mcpServer, cfg.Port); err != nil {
+			fmt.Fprintf(os.Stderr, "HTTP transport error: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown transport: %s (use 'stdio' or 'http')\n", cfg.Transport)
+		os.Exit(1)
+	}
 }
 
 func runCLI() {

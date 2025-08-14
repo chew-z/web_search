@@ -3,168 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// RunMCPServer initializes and runs the MCP server
-func RunMCPServer() {
-	// Create a new flag set for MCP subcommand
-	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
-
-	var (
-		transport     = mcpFlags.String("t", "stdio", "Transport type")
-		transportLong = mcpFlags.String("transport", "", "Transport type (overrides -t)")
-		port          = mcpFlags.String("port", "8080", "HTTP server port")
-		baseURL       = mcpFlags.String("base", defaultBaseURL, "API base URL")
-		verbose       = mcpFlags.Bool("verbose", false, "Enable verbose logging")
-	)
-
-	// Parse MCP-specific flags (skip "answer mcp" args)
-	mcpFlags.Parse(os.Args[2:]) //nolint:errcheck // Flag parsing error handling done by FlagSet
-
-	// Use long form if provided
-	if *transportLong != "" {
-		*transport = *transportLong
-	}
-
-	// Configure logging
-	if !*verbose {
-		log.SetOutput(os.Stderr)
-	}
-
-	// Load environment config
-	envCfg, err := loadEnvConfig()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
-
-	// Create MCP server
-	mcpServer := CreateMCPServer(envCfg.APIKey, *baseURL)
-
-	// Setup context with cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Handle shutdown signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	switch *transport {
-	case "stdio":
-		if err := RunStdioTransport(ctx, mcpServer, sigChan); err != nil {
-			log.Fatalf("STDIO transport error: %v", err)
-		}
-	case "http":
-		if err := RunHTTPTransport(ctx, mcpServer, *port, sigChan); err != nil {
-			log.Fatalf("HTTP transport error: %v", err)
-		}
-	default:
-		log.Fatalf("Unknown transport: %s (use 'stdio' or 'http')", *transport)
-	}
-}
-
-// CreateMCPServer creates and configures the MCP server with tools, resources, and prompts
-func CreateMCPServer(apiKey, baseURL string) *server.MCPServer {
-	// Create MCP server with capabilities
-	mcpServer := server.NewMCPServer(
-		serverName,
-		serverVersion,
-		server.WithToolCapabilities(true),
-		server.WithResourceCapabilities(true, false),
-		server.WithPromptCapabilities(true),
-	)
-
-	// Add web search tool using fluent API
-	mcpServer.AddTool(
-		mcp.NewTool("gpt_websearch",
-			mcp.WithDescription("Search the web using OpenAI's GPT model with web search capabilities"),
-			mcp.WithString("query",
-				mcp.Required(),
-				mcp.Description("The search query or question to ask"),
-			),
-			mcp.WithString("model",
-				mcp.DefaultString(defaultModel),
-				mcp.Description("The GPT model to use (default: gpt-5-mini)"),
-			),
-			mcp.WithString("reasoning_effort",
-				mcp.DefaultString(defaultEffort),
-				mcp.Description("Reasoning effort level: low (3min), medium (5min), or high (10min timeout)"),
-				mcp.Enum("low", "medium", "high"),
-			),
-		),
-		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			// Use proper extraction methods
-			query, err := request.RequireString("query")
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-
-			model := request.GetString("model", defaultModel)
-			effort := request.GetString("reasoning_effort", defaultEffort)
-
-			// Call handler with properly extracted values
-			args := map[string]interface{}{
-				"query":            query,
-				"model":            model,
-				"reasoning_effort": effort,
-			}
-
-			result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-
-			// Convert result to JSON string for text content
-			resultJSON, _ := json.Marshal(result) //nolint:errcheck // JSON marshal for simple types, error ok to ignore
-			return mcp.NewToolResultText(string(resultJSON)), nil
-		},
-	)
-
-	// Add server info resource using fluent API
-	mcpServer.AddResource(
-		mcp.NewResource(
-			"server://info",
-			"Server Information",
-			mcp.WithResourceDescription("Information about the GPT Web Search MCP server"),
-			mcp.WithMIMEType("text/plain"),
-		),
-		func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-			info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nEndpoint: %s\n", serverVersion, baseURL)
-			return []mcp.ResourceContents{
-				mcp.TextResourceContents{
-					URI:      request.Params.URI,
-					MIMEType: "text/plain",
-					Text:     info,
-				},
-			}, nil
-		},
-	)
-
-	// Add web search prompt using fluent API
-	mcpServer.AddPrompt(
-		mcp.NewPrompt("intelligent_web_search",
-			mcp.WithPromptDescription("Use the gpt_websearch tool to answer user questions based on web searching"),
-			mcp.WithArgument("user_question",
-				mcp.RequiredArgument(),
-				mcp.ArgumentDescription("The question, task, problem, or instructions from the user that requires web search"),
-			),
-		),
-		func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-			userQuestion := request.Params.Arguments["user_question"]
-			if userQuestion == "" {
-				return nil, fmt.Errorf("user_question parameter is required")
-			}
-
-			// System instructions for using the web search tool
-			systemPrompt := `You have access to the gpt_websearch tool that performs web searches using OpenAI's GPT models. This tool searches the web, gathers sources, reads them, and provides a single comprehensive answer.
+const webSearchPrompt = `You have access to the gpt_websearch tool that performs web searches using OpenAI's GPT models. ` +
+	`This tool searches the web, gathers sources, reads them, and provides a single comprehensive answer.
 
 CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do not rely on your training data alone.
 
@@ -202,28 +48,139 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
 
 Now use the gpt_websearch tool strategically to answer the user's question.`
 
-			// Return properly structured messages with system and user roles
-			messages := []mcp.PromptMessage{
-				{
-					Role: "system",
-					Content: mcp.TextContent{
-						Type: "text",
-						Text: systemPrompt,
-					},
-				},
-				{
-					Role: "user",
-					Content: mcp.TextContent{
-						Type: "text",
-						Text: userQuestion,
-					},
-				},
-			}
+// NewMCPServer creates and configures an MCP server with tools, resources, and prompts
+func NewMCPServer(cfg MCPConfig) *server.MCPServer {
+	// Create MCP server with capabilities
+	mcpServer := server.NewMCPServer(
+		serverName,
+		serverVersion,
+		server.WithToolCapabilities(true),
+		server.WithResourceCapabilities(true, false),
+		server.WithPromptCapabilities(true),
+	)
 
-			return &mcp.GetPromptResult{
-				Messages: messages,
-			}, nil
-		})
+	// Add web search tool
+	mcpServer.AddTool(
+		mcp.NewTool("gpt_websearch",
+			mcp.WithDescription("Search the web using OpenAI's GPT model with web search capabilities"),
+			mcp.WithString("query",
+				mcp.Required(),
+				mcp.Description("The search query or question to ask"),
+			),
+			mcp.WithString("model",
+				mcp.DefaultString(defaultModel),
+				mcp.Description("The GPT model to use (default: gpt-5-mini)"),
+			),
+			mcp.WithString("reasoning_effort",
+				mcp.DefaultString(defaultEffort),
+				mcp.Description("Reasoning effort level: low (3min), medium (5min), or high (10min timeout)"),
+				mcp.Enum("low", "medium", "high"),
+			),
+		),
+		webSearchHandler(cfg.APIKey, cfg.BaseURL),
+	)
+
+	// Add server info resource
+	mcpServer.AddResource(
+		mcp.NewResource(
+			"server://info",
+			"Server Information",
+			mcp.WithResourceDescription("Information about the GPT Web Search MCP server"),
+			mcp.WithMIMEType("text/plain"),
+		),
+		serverInfoHandler(cfg.BaseURL),
+	)
+
+	// Add intelligent web search prompt
+	mcpServer.AddPrompt(
+		mcp.NewPrompt("intelligent_web_search",
+			mcp.WithPromptDescription("Use the gpt_websearch tool to answer user questions based on web searching"),
+			mcp.WithArgument("user_question",
+				mcp.RequiredArgument(),
+				mcp.ArgumentDescription("The question, task, problem, or instructions from the user that requires web search"),
+			),
+		),
+		webSearchPromptHandler(),
+	)
 
 	return mcpServer
+}
+
+// webSearchHandler returns a handler for the web search tool
+func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Extract parameters
+		query, err := request.RequireString("query")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		model := request.GetString("model", defaultModel)
+		effort := request.GetString("reasoning_effort", defaultEffort)
+
+		// Call handler with properly extracted values
+		args := map[string]interface{}{
+			"query":            query,
+			"model":            model,
+			"reasoning_effort": effort,
+		}
+
+		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		// Convert result to JSON string for text content
+		resultJSON, err := json.Marshal(result)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+		}
+		return mcp.NewToolResultText(string(resultJSON)), nil
+	}
+}
+
+// serverInfoHandler returns a handler for the server info resource
+func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nEndpoint: %s\n", serverVersion, baseURL)
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "text/plain",
+				Text:     info,
+			},
+		}, nil
+	}
+}
+
+// webSearchPromptHandler returns a handler for the intelligent web search prompt
+func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	return func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		userQuestion := request.Params.Arguments["user_question"]
+		if userQuestion == "" {
+			return nil, fmt.Errorf("user_question parameter is required")
+		}
+
+		// Return properly structured messages with system and user roles
+		messages := []mcp.PromptMessage{
+			{
+				Role: "system",
+				Content: mcp.TextContent{
+					Type: "text",
+					Text: webSearchPrompt,
+				},
+			},
+			{
+				Role: "user",
+				Content: mcp.TextContent{
+					Type: "text",
+					Text: userQuestion,
+				},
+			},
+		}
+
+		return &mcp.GetPromptResult{
+			Messages: messages,
+		}, nil
+	}
 }
