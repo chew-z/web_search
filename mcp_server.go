@@ -138,8 +138,8 @@ func CreateMCPServer(apiKey, baseURL string) *server.MCPServer {
 
 	// Add intelligent web search prompt
 	prompt := mcp.Prompt{
-		Name:        "intelligent_web_search",
-		Description: "Intelligently use the gpt_websearch tool to answer user questions with optimal cost-effectiveness",
+		Name:        "web_search",
+		Description: "Use the gpt_websearch tool to answer user questions based on web searching",
 		Arguments: []mcp.PromptArgument{
 			{
 				Name:        "user_question",
