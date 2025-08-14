@@ -92,7 +92,7 @@ func CreateMCPServer(apiKey, baseURL string) *server.MCPServer {
 				},
 				"model": map[string]interface{}{
 					"type":        "string",
-					"description": "The GPT model to use (default: gpt-5)",
+					"description": "The GPT model to use (default: gpt-5-mini)",
 					"default":     defaultModel,
 				},
 				"reasoning_effort": map[string]interface{}{

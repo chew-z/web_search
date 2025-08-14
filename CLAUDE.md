@@ -77,7 +77,7 @@ Uses godotenv for `.env` loading
 ## Configuration Priority
 1. CLI flags
 2. Environment variables  
-3. Defaults (gpt-5, low effort, 3min timeout)
+3. Defaults (gpt-5-mini, low effort, 3min timeout)
 
 ## Testing
 - `integration_test.go` - core API functions

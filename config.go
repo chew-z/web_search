@@ -8,7 +8,7 @@ import (
 
 const (
 	// Default values
-	defaultModel   = "gpt-5"
+	defaultModel   = "gpt-5-mini"
 	defaultEffort  = "low"
 	defaultBaseURL = "https://api.openai.com/v1/responses"
 
@@ -106,16 +106,6 @@ func getTimeoutForEffort(effort string) time.Duration {
 	default:
 		return timeoutLow
 	}
-}
-
-// parseTimeoutWithEffort parses a timeout string or returns effort-based default
-func parseTimeoutWithEffort(timeoutStr, effort string) time.Duration {
-	if timeoutStr != "" {
-		if d, err := time.ParseDuration(timeoutStr); err == nil {
-			return d
-		}
-	}
-	return getTimeoutForEffort(effort)
 }
 
 // validateEffort ensures the effort level is valid

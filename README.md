@@ -43,7 +43,7 @@ Create a `.env` file in the project root:
 
 ```env
 OPENAI_API_KEY=your-api-key-here
-MODEL=gpt-5              # Optional: gpt-5 (default), gpt-5-mini, gpt-5-nano
+MODEL=gpt-5-mini         # Optional: gpt-5-mini (default), gpt-5, gpt-5-nano
 EFFORT=low               # Optional: reasoning effort (low/medium/high)
 SHOW_ALL=false           # Optional: show raw JSON
 QUESTION=                # Optional: default question
@@ -142,7 +142,7 @@ Performs intelligent web searches with cost-effective model selection:
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `query` | string | Yes | - | The search query or question |
-| `model` | string | No | `gpt-5` | GPT model: gpt-5, gpt-5-mini, or gpt-5-nano |
+| `model` | string | No | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano |
 | `reasoning_effort` | string | No | `low` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
 
 ### Prompt: `web_search`
@@ -159,7 +159,7 @@ Enhanced prompt template that guides Claude Desktop to:
   "success": true,
   "answer": "The complete answer to your query...",
   "query": "original query",
-  "model": "gpt-5",
+  "model": "gpt-5-mini",
   "effort": "low",
   "timeout_used": "3m0s"
 }
@@ -173,7 +173,7 @@ answer [options] [question]
 
 Options:
   -q, -question    Question to ask (required, can also use positional argument)
-  -model          Model: gpt-5 (default), gpt-5-mini, gpt-5-nano
+  -model          Model: gpt-5-mini (default), gpt-5, gpt-5-nano
   -effort         Reasoning effort: low (3min), medium (5min), high (10min timeout)
   -timeout        Request timeout (overrides effort-based defaults)
   -show-all       Show raw JSON response

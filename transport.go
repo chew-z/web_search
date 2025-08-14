@@ -94,7 +94,7 @@ func RunHTTPTransport(ctx context.Context, mcpServer *server.MCPServer, port str
         <h4>Parameters:</h4>
         <ul>
             <li><code>query</code> (required) - The search query or question</li>
-            <li><code>model</code> (optional) - GPT model to use (default: gpt-5)</li>
+            <li><code>model</code> (optional) - GPT model to use (default: gpt-5-mini)</li>
             <li><code>reasoning_effort</code> (optional) - Effort level with automatic timeout:
                 <ul>
                     <li><code>low</code> - 3 minute timeout</li>
