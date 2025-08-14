@@ -94,7 +94,7 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 
 	// Add intelligent web search prompt
 	mcpServer.AddPrompt(
-		mcp.NewPrompt("intelligent_web_search",
+		mcp.NewPrompt("web_search",
 			mcp.WithPromptDescription("Use the gpt_websearch tool to answer user questions based on web searching"),
 			mcp.WithArgument("user_question",
 				mcp.RequiredArgument(),
@@ -238,17 +238,10 @@ func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.
 		// Return properly structured messages with system and user roles
 		messages := []mcp.PromptMessage{
 			{
-				Role: "system",
-				Content: mcp.TextContent{
-					Type: "text",
-					Text: webSearchPrompt,
-				},
-			},
-			{
 				Role: "user",
 				Content: mcp.TextContent{
 					Type: "text",
-					Text: userQuestion,
+					Text: webSearchPrompt + "\n<user_question>\n" + userQuestion + "\n</user_question>\n",
 				},
 			},
 		}
