@@ -1,0 +1,13 @@
+.DS_Store
+bin/**
+.env
+go.sum
+*.log
+
+.aider*
+.claude/**
+.gemini/**
+.vscode/**
+.repomix/**
+
+repomix.config.json
