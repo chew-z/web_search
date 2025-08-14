@@ -8,6 +8,9 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
@@ -90,12 +93,23 @@ func ExtractAnswer(apiResp *apiResponse) string {
 
 // HandleWebSearch handles web search requests for the MCP server
 func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (interface{}, error) {
+	// Get the MCP server from context for logging (if available)
+	mcpServer := server.ServerFromContext(ctx)
+
 	// Extract parameters
 	query, ok := args["query"].(string)
 	if !ok || query == "" {
+		errMsg := "Please provide a query to search for"
+		if mcpServer != nil {
+			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				mcp.LoggingLevelError,
+				"api_handler",
+				errMsg,
+			))
+		}
 		return map[string]interface{}{
 			"success": false,
-			"error":   "Please provide a query to search for",
+			"error":   errMsg,
 		}, nil
 	}
 
@@ -116,13 +130,30 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 		return nil, err
 	}
 
-	// Extract the answer from response
+	// Extract answer from response
 	answer := ExtractAnswer(apiResp)
 	if answer == "" {
+		errMsg := "No answer found in response"
+		if mcpServer != nil {
+			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				mcp.LoggingLevelWarning,
+				"api_handler",
+				errMsg,
+			))
+		}
 		return map[string]interface{}{
 			"success": false,
-			"error":   "No answer found in response",
+			"error":   errMsg,
 		}, nil
+	}
+
+	// Log successful completion
+	if mcpServer != nil {
+		_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			mcp.LoggingLevelDebug,
+			"api_handler",
+			fmt.Sprintf("Search completed successfully, answer length: %d characters", len(answer)),
+		))
 	}
 
 	// Return structured response

@@ -54,6 +54,7 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 	mcpServer := server.NewMCPServer(
 		serverName,
 		serverVersion,
+		server.WithLogging(),
 		server.WithToolCapabilities(true),
 		server.WithResourceCapabilities(true, false),
 		server.WithPromptCapabilities(true),
@@ -109,14 +110,33 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 // webSearchHandler returns a handler for the web search tool
 func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Get the server from context to send log messages
+		mcpServer := server.ServerFromContext(ctx)
+
 		// Extract parameters
 		query, err := request.RequireString("query")
 		if err != nil {
+			if mcpServer != nil {
+				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+					mcp.LoggingLevelError,
+					"web_search",
+					fmt.Sprintf("Failed to extract query parameter: %v", err),
+				))
+			}
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
 		model := request.GetString("model", defaultModel)
 		effort := request.GetString("reasoning_effort", defaultEffort)
+
+		// Log the search request
+		if mcpServer != nil {
+			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				mcp.LoggingLevelInfo,
+				"web_search",
+				fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s'", query, model, effort),
+			))
+		}
 
 		// Call handler with properly extracted values
 		args := map[string]interface{}{
@@ -127,12 +147,35 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
 		if err != nil {
+			if mcpServer != nil {
+				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+					mcp.LoggingLevelError,
+					"web_search",
+					fmt.Sprintf("Web search failed: %v", err),
+				))
+			}
 			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		// Log success
+		if mcpServer != nil {
+			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				mcp.LoggingLevelInfo,
+				"web_search",
+				"Web search completed successfully",
+			))
 		}
 
 		// Convert result to JSON string for text content
 		resultJSON, err := json.Marshal(result)
 		if err != nil {
+			if mcpServer != nil {
+				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+					mcp.LoggingLevelError,
+					"web_search",
+					fmt.Sprintf("Failed to marshal result: %v", err),
+				))
+			}
 			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
 		}
 		return mcp.NewToolResultText(string(resultJSON)), nil
@@ -142,6 +185,18 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 // serverInfoHandler returns a handler for the server info resource
 func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		// Get the server from context to send log messages
+		mcpServer := server.ServerFromContext(ctx)
+
+		// Log the resource access
+		if mcpServer != nil {
+			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				mcp.LoggingLevelDebug,
+				"server_info",
+				fmt.Sprintf("Server info resource accessed: URI=%s", request.Params.URI),
+			))
+		}
+
 		info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nEndpoint: %s\n", serverVersion, baseURL)
 		return []mcp.ResourceContents{
 			mcp.TextResourceContents{
@@ -156,9 +211,28 @@ func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceReq
 // webSearchPromptHandler returns a handler for the intelligent web search prompt
 func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		// Get the server from context to send log messages
+		mcpServer := server.ServerFromContext(ctx)
+
 		userQuestion := request.Params.Arguments["user_question"]
 		if userQuestion == "" {
+			if mcpServer != nil {
+				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+					mcp.LoggingLevelError,
+					"web_search_prompt",
+					"user_question parameter is required",
+				))
+			}
 			return nil, fmt.Errorf("user_question parameter is required")
+		}
+
+		// Log the prompt request
+		if mcpServer != nil {
+			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				mcp.LoggingLevelDebug,
+				"web_search_prompt",
+				fmt.Sprintf("Generating prompt for question: %s", userQuestion),
+			))
 		}
 
 		// Return properly structured messages with system and user roles
