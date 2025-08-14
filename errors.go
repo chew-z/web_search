@@ -32,7 +32,7 @@ func (e *APIError) Error() string {
 }
 
 // fail prints to stderr and exits non-zero.
-func fail(code int, msg string, args ...any) {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
+func fail(code int, msg string) {
+	fmt.Fprintf(os.Stderr, "%s\n", msg)
 	os.Exit(code)
 }
