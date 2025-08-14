@@ -136,30 +136,74 @@ func CreateMCPServer(apiKey, baseURL string) *server.MCPServer {
 		}, nil
 	})
 
-	// Add a helpful prompt template
+	// Add intelligent web search prompt
 	prompt := mcp.Prompt{
-		Name:        "web_search",
-		Description: "Template for web search queries",
+		Name:        "intelligent_web_search",
+		Description: "Intelligently use the gpt_websearch tool to answer user questions with optimal cost-effectiveness",
 		Arguments: []mcp.PromptArgument{
 			{
-				Name:        "topic",
-				Description: "The topic to search for",
+				Name:        "user_question",
+				Description: "The question, task, problem, or instructions from the user that requires web search",
 				Required:    true,
 			},
 		},
 	}
 	mcpServer.AddPrompt(prompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		query, ok := request.Params.Arguments["topic"]
-		if !ok || query == "" {
-			return nil, fmt.Errorf("topic parameter is required")
+		userQuestion, ok := request.Params.Arguments["user_question"]
+		if !ok || userQuestion == "" {
+			return nil, fmt.Errorf("user_question parameter is required")
 		}
 
 		messages := []mcp.PromptMessage{
 			{
+				Role: "system",
+				Content: mcp.TextContent{
+					Type: "text",
+					Text: `You have access to the gpt_websearch tool that performs web searches using OpenAI's GPT models. ` +
+						`This tool searches the web, gathers sources, reads them, and provides a single comprehensive answer.
+
+CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do not rely on your training data alone.
+
+## Model Selection (choose cost-effectively):
+- gpt-5-nano: Simple facts, definitions, quick lookups, basic summaries
+- gpt-5-mini: Well-defined research tasks, comparisons, specific topics with clear scope  
+- gpt-5: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
+
+## Reasoning Effort Selection:
+- low: Factual queries, simple definitions, straightforward questions (3 min timeout)
+- medium: Research requiring synthesis, comparisons, moderate complexity (5 min timeout)  
+- high: Complex analysis, multi-part questions, deep research (10 min timeout)
+
+## Search Strategy:
+1. ANALYZE the user's question in the context of our conversation
+2. FORMULATE detailed, specific search queries (expand beyond the original question with context and specifics)
+3. DECIDE on search approach:
+   - Single comprehensive search: When question can be fully addressed in one query
+   - Sequential searches: When answers build on each other or need follow-up
+   - Parallel searches: When covering different aspects of the same topic
+4. SELECT appropriate model and reasoning_effort for each search
+5. SYNTHESIZE results into a comprehensive, coherent answer
+
+## Query Formulation Guidelines:
+- Expand user questions with conversation context and specifics
+- Include relevant constraints (timeframe, geographic scope, domain)
+- Make queries specific enough to get focused, useful results
+- Consider breaking complex questions into focused sub-queries
+
+## Important Notes:
+- The tool returns comprehensive answers, not citations or links to extract
+- Be cost-conscious: use the simplest model that can handle the complexity
+- You may need multiple searches for comprehensive coverage
+- Always address the original user question completely
+
+Now use the gpt_websearch tool strategically to answer the user's question.`,
+				},
+			},
+			{
 				Role: "user",
 				Content: mcp.TextContent{
 					Type: "text",
-					Text: fmt.Sprintf("Search the web for: %s", query),
+					Text: userQuestion,
 				},
 			},
 		}
