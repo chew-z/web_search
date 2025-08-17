@@ -147,7 +147,7 @@ func runCLI() {
 
 	// Make API call
 	ctx := context.Background()
-	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *timeout)
+	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, "", *timeout)
 	if err != nil {
 		fail(2, err.Error())
 	}

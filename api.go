@@ -14,7 +14,7 @@ import (
 )
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
-func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort string, timeout time.Duration) (*apiResponse, error) {
+func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, previousResponseID string, timeout time.Duration) (*apiResponse, error) {
 	body := requestBody{
 		Model: model,
 		Input: query,
@@ -24,6 +24,7 @@ func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort string, 
 		Tools: []reqTool{
 			{Type: "web_search_preview"},
 		},
+		PreviousResponseID: previousResponseID,
 	}
 
 	buf, err := json.Marshal(body)
@@ -121,11 +122,13 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck // Type assertion ok to ignore
 	effort = validateEffort(effort)
 
+	previousResponseID, _ := args["previous_response_id"].(string) //nolint:errcheck // Type assertion ok to ignore
+
 	// Use effort-based timeout
 	timeout := getTimeoutForEffort(effort)
 
 	// Make API call
-	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, timeout)
+	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, previousResponseID, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -158,11 +161,14 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 
 	// Return structured response
 	return map[string]interface{}{
-		"success":      true,
-		"answer":       answer,
-		"query":        query,
-		"model":        model,
-		"effort":       effort,
-		"timeout_used": timeout.String(),
+		"success":          true,
+		"answer":           answer,
+		"query":            query,
+		"model":            apiResp.Model,
+		"effort":           apiResp.Reasoning.Effort,
+		"timeout_used":     timeout.String(),
+		"id":               apiResp.ID,
+		"requested_model":  model,
+		"requested_effort": effort,
 	}, nil
 }

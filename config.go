@@ -32,10 +32,11 @@ type reqTool struct {
 }
 
 type requestBody struct {
-	Model     string       `json:"model"`
-	Input     string       `json:"input"`
-	Reasoning reqReasoning `json:"reasoning"`
-	Tools     []reqTool    `json:"tools"`
+	Model              string       `json:"model"`
+	Input              string       `json:"input"`
+	Reasoning          reqReasoning `json:"reasoning"`
+	Tools              []reqTool    `json:"tools"`
+	PreviousResponseID string       `json:"previous_response_id,omitempty"`
 }
 
 type respContent struct {
@@ -49,7 +50,14 @@ type respItem struct {
 }
 
 type apiResponse struct {
-	Output []respItem `json:"output"`
+	ID        string       `json:"id"`
+	Model     string       `json:"model"`
+	Reasoning apiReasoning `json:"reasoning"`
+	Output    []respItem   `json:"output"`
+}
+
+type apiReasoning struct {
+	Effort string `json:"effort"`
 }
 
 // EnvConfig centralizes environment-derived configuration.

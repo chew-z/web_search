@@ -24,6 +24,13 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
 - medium: Research requiring synthesis, comparisons, moderate complexity (5 min timeout)
 - high: Complex analysis, multi-part questions, deep research (10 min timeout)
 
+## Conversation Continuity:
+- Each gpt_websearch response includes an "id" field (e.g., "resp_68a243e0341c81958fe34a474cdd57bb07db1800de6fc799")
+- REMEMBER this ID from each search response
+- For follow-up questions or clarifications about the same topic, use the "previous_response_id" parameter
+- This maintains conversation context and improves answer quality
+- Only use previous_response_id when the follow-up is directly related to the previous search
+
 ## Search Strategy:
 1. ANALYZE the user's question in the context of our conversation
 2. FORMULATE detailed, specific search queries (expand beyond the original question with context and specifics)
@@ -32,7 +39,8 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
    - Sequential searches: When answers build on each other or need follow-up
    - Parallel searches: When covering different aspects of the same topic
 4. SELECT appropriate model and reasoning_effort for each search
-5. SYNTHESIZE results into a comprehensive, coherent answer
+5. If this is a follow-up to a previous search, include the previous_response_id
+6. SYNTHESIZE results into a comprehensive, coherent answer
 
 ## Query Formulation Guidelines:
 - Expand user questions with conversation context and specifics
@@ -45,6 +53,7 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
 - Be cost-conscious: use the simplest model that can handle the complexity
 - You may need multiple searches for comprehensive coverage
 - Always address the original user question completely
+- Remember and use response IDs for conversation continuity when appropriate
 
 Now use the gpt_websearch tool strategically to answer the user's question.`
 
@@ -76,6 +85,9 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 				mcp.DefaultString(defaultEffort),
 				mcp.Description("Reasoning effort level: low (3min), medium (5min), or high (10min timeout)"),
 				mcp.Enum("low", "medium", "high"),
+			),
+			mcp.WithString("previous_response_id",
+				mcp.Description("Optional: Previous response ID for conversation continuity"),
 			),
 		),
 		webSearchHandler(cfg.APIKey, cfg.BaseURL),
@@ -128,6 +140,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 
 		model := request.GetString("model", defaultModel)
 		effort := request.GetString("reasoning_effort", defaultEffort)
+		previousResponseID := request.GetString("previous_response_id", "")
 
 		// Log the search request
 		if mcpServer != nil {
@@ -140,9 +153,10 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 
 		// Call handler with properly extracted values
 		args := map[string]interface{}{
-			"query":            query,
-			"model":            model,
-			"reasoning_effort": effort,
+			"query":                query,
+			"model":                model,
+			"reasoning_effort":     effort,
+			"previous_response_id": previousResponseID,
 		}
 
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
