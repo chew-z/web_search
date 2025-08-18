@@ -19,10 +19,40 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
 - gpt-5-mini: Well-defined research tasks, comparisons, specific topics with clear scope
 - gpt-5: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
 
-## Reasoning Effort Selection:
-- low: Factual queries, simple definitions, straightforward questions (3 min timeout)
-- medium: Research requiring synthesis, comparisons, moderate complexity (5 min timeout)
-- high: Complex analysis, multi-part questions, deep research (10 min timeout)
+## Reasoning Effort Selection (choose based on task complexity):
+- **minimal**: Fastest time-to-first-token with very few reasoning tokens. BEST FOR:
+  - Coding questions and instruction following scenarios
+  - Simple factual lookups requiring immediate responses
+  - Tasks where speed is critical over deep analysis
+  - Direct questions with straightforward answers (90s timeout)
+- **low**: Quick responses for basic queries. BEST FOR:
+  - Simple definitions and factual questions
+  - Straightforward lookups without complex reasoning
+  - When you need basic information quickly (3 min timeout)
+- **medium**: Balanced reasoning for moderate complexity. BEST FOR:
+  - Research requiring some synthesis and comparison
+  - Questions needing moderate analysis and context
+  - Most general-purpose web searches (5 min timeout, DEFAULT)
+- **high**: Deep analysis for complex tasks. BEST FOR:
+  - Multi-faceted problems requiring comprehensive research
+  - Complex analysis with multiple perspectives
+  - In-depth investigations and detailed research (10 min timeout)
+
+## Verbosity Selection (controls response length and detail):
+- **low**: Concise, shorter responses with minimal commentary. BEST FOR:
+  - Quick facts and direct answers
+  - When you need just the essential information
+  - Situations where brevity is preferred
+  - Code-focused responses with minimal explanation
+- **medium**: Balanced responses with moderate detail and explanation. BEST FOR:
+  - Most general-purpose queries (DEFAULT)
+  - When you need context but not excessive detail
+  - Balanced explanations with reasonable depth
+- **high**: Detailed responses with comprehensive explanations. BEST FOR:
+  - Learning scenarios requiring thorough explanation
+  - Complex topics needing examples and structured information
+  - When comprehensive understanding is the goal
+  - Detailed code with inline explanations and documentation
 
 ## Conversation Continuity:
 - Each gpt_websearch response includes an "id" field (e.g., "resp_68a243e0341c81958fe34a474cdd57bb07db1800de6fc799")
@@ -31,14 +61,37 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
 - This maintains conversation context and improves answer quality
 - Only use previous_response_id when the follow-up is directly related to the previous search
 
+## Parameter Selection Strategy:
+CHOOSE OPTIMAL COMBINATIONS for cost-effectiveness and performance:
+
+**For Speed-Critical Tasks:**
+- Model: gpt-5-nano + Effort: minimal + Verbosity: low
+- Use when: Quick facts, simple definitions, immediate answers needed
+
+**For Coding Questions:**
+- Model: gpt-5 + Effort: minimal + Verbosity: medium/low
+- Use when: Code examples, technical instructions, programming help
+
+**For Standard Research:**
+- Model: gpt-5-mini + Effort: medium + Verbosity: medium
+- Use when: Most web searches, balanced analysis, general topics
+
+**For Complex Analysis:**
+- Model: gpt-5 + Effort: high + Verbosity: high
+- Use when: Multi-part questions, comprehensive research, detailed explanations
+
+**For Learning/Educational:**
+- Model: gpt-5-mini/gpt-5 + Effort: medium/high + Verbosity: high
+- Use when: Explanations needed, tutorials, comprehensive understanding
+
 ## Search Strategy:
-1. ANALYZE the user's question in the context of our conversation
+1. ANALYZE the user's question and determine appropriate model/effort/verbosity combination
 2. FORMULATE detailed, specific search queries (expand beyond the original question with context and specifics)
 3. DECIDE on search approach:
    - Single comprehensive search: When question can be fully addressed in one query
    - Sequential searches: When answers build on each other or need follow-up
    - Parallel searches: When covering different aspects of the same topic
-4. SELECT appropriate model and reasoning_effort for each search
+4. SELECT appropriate parameters based on the guidance above
 5. If this is a follow-up to a previous search, include the previous_response_id
 6. SYNTHESIZE results into a comprehensive, coherent answer
 
@@ -83,7 +136,12 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 			),
 			mcp.WithString("reasoning_effort",
 				mcp.DefaultString(defaultEffort),
-				mcp.Description("Reasoning effort level: low (3min), medium (5min), or high (10min timeout)"),
+				mcp.Description("Reasoning effort level: minimal (90s), low (3min), medium (5min), or high (10min timeout)"),
+				mcp.Enum("minimal", "low", "medium", "high"),
+			),
+			mcp.WithString("verbosity",
+				mcp.DefaultString(defaultVerbosity),
+				mcp.Description("Response verbosity level: low (concise), medium (balanced), or high (detailed with explanations)"),
 				mcp.Enum("low", "medium", "high"),
 			),
 			mcp.WithString("previous_response_id",
@@ -140,6 +198,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 
 		model := request.GetString("model", defaultModel)
 		effort := request.GetString("reasoning_effort", defaultEffort)
+		verbosity := request.GetString("verbosity", defaultVerbosity)
 		previousResponseID := request.GetString("previous_response_id", "")
 
 		// Log the search request
@@ -147,7 +206,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelInfo,
 				"web_search",
-				fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s'", query, model, effort),
+				fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s'", query, model, effort, verbosity),
 			))
 		}
 
@@ -156,6 +215,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			"query":                query,
 			"model":                model,
 			"reasoning_effort":     effort,
+			"verbosity":            verbosity,
 			"previous_response_id": previousResponseID,
 		}
 

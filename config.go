@@ -8,18 +8,20 @@ import (
 
 const (
 	// Default values
-	defaultModel   = "gpt-5-mini"
-	defaultEffort  = "low"
-	defaultBaseURL = "https://api.openai.com/v1/responses"
+	defaultModel     = "gpt-5-mini"
+	defaultEffort    = "medium"
+	defaultVerbosity = "medium"
+	defaultBaseURL   = "https://api.openai.com/v1/responses"
 
 	// Server metadata
 	serverName    = "gpt-websearch-mcp"
 	serverVersion = "1.0.0"
 
 	// Timeouts based on reasoning effort
-	timeoutLow    = 3 * time.Minute
-	timeoutMedium = 5 * time.Minute
-	timeoutHigh   = 10 * time.Minute
+	timeoutMinimal = 90 * time.Second
+	timeoutLow     = 3 * time.Minute
+	timeoutMedium  = 5 * time.Minute
+	timeoutHigh    = 10 * time.Minute
 )
 
 // API request/response structures
@@ -31,10 +33,15 @@ type reqTool struct {
 	Type string `json:"type"`
 }
 
+type reqText struct {
+	Verbosity string `json:"verbosity"`
+}
+
 type requestBody struct {
 	Model              string       `json:"model"`
 	Input              string       `json:"input"`
 	Reasoning          reqReasoning `json:"reasoning"`
+	Text               reqText      `json:"text"`
 	Tools              []reqTool    `json:"tools"`
 	PreviousResponseID string       `json:"previous_response_id,omitempty"`
 }
@@ -120,6 +127,8 @@ func getTimeoutForEffort(effort string) time.Duration {
 		return timeoutMedium
 	case "low", "":
 		return timeoutLow
+	case "minimal":
+		return timeoutMinimal
 	default:
 		return timeoutLow
 	}
@@ -128,12 +137,24 @@ func getTimeoutForEffort(effort string) time.Duration {
 // validateEffort ensures the effort level is valid
 func validateEffort(effort string) string {
 	switch effort {
-	case "low", "medium", "high":
+	case "minimal", "low", "medium", "high":
 		return effort
 	case "":
 		return defaultEffort
 	default:
 		return defaultEffort
+	}
+}
+
+// validateVerbosity ensures the verbosity level is valid
+func validateVerbosity(verbosity string) string {
+	switch verbosity {
+	case "low", "medium", "high":
+		return verbosity
+	case "":
+		return defaultVerbosity
+	default:
+		return defaultVerbosity
 	}
 }
 

@@ -9,6 +9,7 @@ A Go application that provides intelligent web search capabilities using OpenAI'
 - 🚀 **Dual Mode**: CLI tool and MCP server with stdio/HTTP transports
 - ⚙️ **Smart Configuration**: Effort-based timeouts (3/5/10 minutes) and environment-driven setup
 - 🧠 **Enhanced MCP Prompts**: Intelligent prompt templates guide optimal tool usage
+- 🔄 **Conversation Continuity**: Response IDs enable follow-up questions with maintained context
 - 🔐 **Secure**: Environment-based API key management
 
 ## Installation
@@ -137,13 +138,14 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ## MCP Server Features
 
 ### Tool: `gpt_websearch`
-Performs intelligent web searches with cost-effective model selection:
+Performs intelligent web searches with cost-effective model selection and conversation continuity:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `query` | string | Yes | - | The search query or question |
 | `model` | string | No | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano |
 | `reasoning_effort` | string | No | `low` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
+| `previous_response_id` | string | No | - | Previous response ID for conversation continuity |
 
 ### Prompt: `web_search`
 Enhanced prompt template that guides Claude Desktop to:
@@ -151,6 +153,7 @@ Enhanced prompt template that guides Claude Desktop to:
 - Select cost-effective models based on complexity
 - Choose appropriate reasoning effort levels
 - Use single, sequential, or parallel search strategies
+- Remember and use response IDs for conversation continuity
 
 ### Example Response
 
@@ -159,11 +162,53 @@ Enhanced prompt template that guides Claude Desktop to:
   "success": true,
   "answer": "The complete answer to your query...",
   "query": "original query",
-  "model": "gpt-5-mini",
+  "model": "gpt-5-mini-2025-08-07",
   "effort": "low",
-  "timeout_used": "3m0s"
+  "timeout_used": "3m0s",
+  "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
+  "requested_model": "gpt-5-mini",
+  "requested_effort": "low"
 }
 ```
+
+### Conversation Continuity
+
+The MCP server supports conversation continuity through response IDs. Each search response includes an `id` field that can be used in follow-up queries to maintain context:
+
+**Initial Query:**
+```json
+{
+  "name": "gpt_websearch",
+  "arguments": {
+    "query": "Tell me about Luxembourg City",
+    "model": "gpt-5-mini",
+    "reasoning_effort": "medium"
+  }
+}
+```
+
+**Response includes ID:**
+```json
+{
+  "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
+  "answer": "Luxembourg City is the capital...",
+  // ... other fields
+}
+```
+
+**Follow-up Query with Context:**
+```json
+{
+  "name": "gpt_websearch",
+  "arguments": {
+    "query": "What are the main tourist attractions there?",
+    "previous_response_id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
+    "reasoning_effort": "low"
+  }
+}
+```
+
+The AI assistant will automatically remember context from the previous search and provide more relevant answers for follow-up questions.
 
 ## Command-Line Reference
 
@@ -232,7 +277,8 @@ fetch('http://localhost:8080/message', {
       arguments: {
         query: 'Latest AI news',
         model: 'gpt-5-mini',
-        reasoning_effort: 'medium'  // 5-minute timeout
+        reasoning_effort: 'medium',  // 5-minute timeout
+        previous_response_id: 'resp_123...'  // Optional: for follow-up questions
       }
     },
     id: 1

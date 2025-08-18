@@ -14,12 +14,15 @@ import (
 )
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
-func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, previousResponseID string, timeout time.Duration) (*apiResponse, error) {
+func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration) (*apiResponse, error) {
 	body := requestBody{
 		Model: model,
 		Input: query,
 		Reasoning: reqReasoning{
 			Effort: effort,
+		},
+		Text: reqText{
+			Verbosity: verbosity,
 		},
 		Tools: []reqTool{
 			{Type: "web_search_preview"},
@@ -122,13 +125,16 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck // Type assertion ok to ignore
 	effort = validateEffort(effort)
 
+	verbosity, _ := args["verbosity"].(string) //nolint:errcheck // Type assertion ok to ignore
+	verbosity = validateVerbosity(verbosity)
+
 	previousResponseID, _ := args["previous_response_id"].(string) //nolint:errcheck // Type assertion ok to ignore
 
 	// Use effort-based timeout
 	timeout := getTimeoutForEffort(effort)
 
 	// Make API call
-	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, previousResponseID, timeout)
+	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, verbosity, previousResponseID, timeout)
 	if err != nil {
 		return nil, err
 	}

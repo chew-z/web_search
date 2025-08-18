@@ -100,6 +100,7 @@ func runCLI() {
 			}
 			return defaultEffort
 		}(), "effort (env EFFORT)")
+		verbosity   = flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
 		questionVal string
 		timeout     = flag.Duration("timeout", func() time.Duration {
 			if envCfg.HasTimeout {
@@ -135,6 +136,10 @@ func runCLI() {
 		fail(2, "please provide a question to ask (use -q flag or positional argument)")
 	}
 
+	// Validate effort and verbosity parameters
+	*effort = validateEffort(*effort)
+	*verbosity = validateVerbosity(*verbosity)
+
 	// If timeout wasn't explicitly set, use effort-based timeout
 	if !envCfg.HasTimeout {
 		flag.Visit(func(f *flag.Flag) {
@@ -147,7 +152,7 @@ func runCLI() {
 
 	// Make API call
 	ctx := context.Background()
-	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, "", *timeout)
+	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *verbosity, "", *timeout)
 	if err != nil {
 		fail(2, err.Error())
 	}
