@@ -1,20 +1,18 @@
 # Release Notes
 
-## v0.1.0 - 2025-08-14
+## v0.2.0 - 2025-08-18
 
 ### 🎉 New Features
-- **Go CLI**: A new command-line interface has been introduced to interact with the API.
-- **Web Search Tool**: The application now includes a web search tool and corresponding server functionality.
-- **MCP Server**: A new MCP server has been implemented using the `mcp-go` library.
-- **Configuration**: The application now loads its configuration from environment variables for better flexibility.
-- **Client Logging**: Client-side logging has been enabled and integrated.
+- **Conversation Continuity**: Implemented conversation continuity for web searches, allowing for more context-aware interactions.
+- **Web Search Tool**: Added a web search tool and server functionality to the API.
+- **Logging**: Enabled and integrated client logging for better debugging and monitoring.
+- **Configuration**: The application now loads configuration from environment variables, providing more flexibility.
+- **CLI**: Added a Go CLI for interacting with the API.
+- **Default Model**: Set `gpt-5-mini` as the default model for all interactions.
 
 ### 🔧 Improvements
-- **Web Search Prompt**: The web search prompt has been simplified and enhanced for more cost-effective GPT usage.
-- **API & Transport**: The transport layer has been simplified and API usage has been enhanced.
-- **Default Model**: `gpt-5-mini` is now the default model.
-- **Code Refactoring**: The CLI has been refactored to use a dedicated API call function for better code organization.
+- **Prompt Engineering**: Refined and enhanced web search prompts for clarity, efficiency, and cost-effectiveness.
+- **Code Refactoring**: Simplified web search prompt construction and refactored the MCP server to use new library features, improving code quality and maintainability.
 
 ### 📚 Documentation
-- Added `CLAUDE.md`, `IMPROVEMENTS.md`, and `REVIEW.md` to provide more detailed project information.
-- The `README.md` has been significantly updated with more comprehensive information.
+- Added and updated release notes.
