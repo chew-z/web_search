@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -96,7 +97,7 @@ func ExtractAnswer(apiResp *apiResponse) string {
 }
 
 // HandleWebSearch handles web search requests for the MCP server
-func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (interface{}, error) {
+func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (*WebSearchResult, error) {
 	// Get the MCP server from context for logging (if available)
 	mcpServer := server.ServerFromContext(ctx)
 
@@ -105,16 +106,20 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	if !ok || query == "" {
 		errMsg := "Please provide a query to search for"
 		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			if err := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelError,
 				"api_handler",
 				errMsg,
-			))
+			)); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", err)
+			}
 		}
-		return map[string]interface{}{
-			"success": false,
-			"error":   errMsg,
-		}, nil
+		return &WebSearchResult{
+				Success: false,
+				Error:   errMsg,
+				Query:   query,
+			},
+			nil
 	}
 
 	model, _ := args["model"].(string) //nolint:errcheck // Type assertion ok to ignore
@@ -144,37 +149,59 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	if answer == "" {
 		errMsg := "No answer found in response"
 		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			if err := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelWarning,
 				"api_handler",
 				errMsg,
-			))
+			)); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", err)
+			}
 		}
-		return map[string]interface{}{
-			"success": false,
-			"error":   errMsg,
+		return &WebSearchResult{
+			Success:         false,
+			Error:           errMsg,
+			Query:           query,
+			RequestedModel:  model,
+			RequestedEffort: effort,
+			TimeoutUsed:     timeout.String(),
 		}, nil
 	}
 
 	// Log successful completion
 	if mcpServer != nil {
-		_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+		if err := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 			mcp.LoggingLevelDebug,
 			"api_handler",
 			fmt.Sprintf("Search completed successfully, answer length: %d characters", len(answer)),
-		))
+		)); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", err)
+		}
 	}
 
 	// Return structured response
-	return map[string]interface{}{
-		"success":          true,
-		"answer":           answer,
-		"query":            query,
-		"model":            apiResp.Model,
-		"effort":           apiResp.Reasoning.Effort,
-		"timeout_used":     timeout.String(),
-		"id":               apiResp.ID,
-		"requested_model":  model,
-		"requested_effort": effort,
+	return &WebSearchResult{
+		Success:         true,
+		Answer:          answer,
+		Query:           query,
+		Model:           apiResp.Model,
+		Effort:          apiResp.Reasoning.Effort,
+		TimeoutUsed:     timeout.String(),
+		ID:              apiResp.ID,
+		RequestedModel:  model,
+		RequestedEffort: effort,
 	}, nil
+}
+
+// WebSearchResult defines the structured result returned to MCP clients
+type WebSearchResult struct {
+	Success         bool   `json:"success"`
+	Answer          string `json:"answer,omitempty"`
+	Query           string `json:"query"`
+	Model           string `json:"model"`
+	Effort          string `json:"effort"`
+	TimeoutUsed     string `json:"timeout_used"`
+	ID              string `json:"id,omitempty"`
+	RequestedModel  string `json:"requested_model"`
+	RequestedEffort string `json:"requested_effort"`
+	Error           string `json:"error,omitempty"`
 }

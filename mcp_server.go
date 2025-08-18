@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -86,11 +86,13 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		query, err := request.RequireString("query")
 		if err != nil {
 			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 					mcp.LoggingLevelError,
 					"web_search",
 					fmt.Sprintf("Failed to extract query parameter: %v", err),
-				))
+				)); logErr != nil {
+					fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+				}
 			}
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -102,11 +104,13 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 
 		// Log the search request
 		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelInfo,
 				"web_search",
 				fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s'", query, model, effort, verbosity),
-			))
+			)); logErr != nil {
+				fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+			}
 		}
 
 		// Call handler with properly extracted values
@@ -121,37 +125,30 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
 		if err != nil {
 			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 					mcp.LoggingLevelError,
 					"web_search",
 					fmt.Sprintf("Web search failed: %v", err),
-				))
+				)); logErr != nil {
+					fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+				}
 			}
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
 		// Log success
 		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelInfo,
 				"web_search",
 				"Web search completed successfully",
-			))
+			)); logErr != nil {
+				fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+			}
 		}
 
-		// Convert result to JSON string for text content
-		resultJSON, err := json.Marshal(result)
-		if err != nil {
-			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-					mcp.LoggingLevelError,
-					"web_search",
-					fmt.Sprintf("Failed to marshal result: %v", err),
-				))
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
-		}
-		return mcp.NewToolResultText(string(resultJSON)), nil
+		// Return structured JSON content rather than a JSON string
+		return mcp.NewToolResultStructuredOnly(result), nil
 	}
 }
 
@@ -163,11 +160,13 @@ func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceReq
 
 		// Log the resource access
 		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelDebug,
 				"server_info",
 				fmt.Sprintf("Server info resource accessed: URI=%s", request.Params.URI),
-			))
+			)); logErr != nil {
+				fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+			}
 		}
 
 		info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nEndpoint: %s\n", serverVersion, baseURL)
@@ -190,22 +189,26 @@ func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.
 		userQuestion := request.Params.Arguments["user_question"]
 		if userQuestion == "" {
 			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+				if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 					mcp.LoggingLevelError,
 					"web_search_prompt",
 					"user_question parameter is required",
-				))
+				)); logErr != nil {
+					fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+				}
 			}
 			return nil, fmt.Errorf("user_question parameter is required")
 		}
 
 		// Log the prompt request
 		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
+			if logErr := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
 				mcp.LoggingLevelDebug,
 				"web_search_prompt",
 				fmt.Sprintf("Generating prompt for question: %s", userQuestion),
-			))
+			)); logErr != nil {
+				fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", logErr)
+			}
 		}
 
 		// Return properly structured messages with system and user roles
