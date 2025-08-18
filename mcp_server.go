@@ -54,12 +54,29 @@ CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do 
   - When comprehensive understanding is the goal
   - Detailed code with inline explanations and documentation
 
-## Conversation Continuity:
+## Conversation Continuity - Critical for Performance:
+**WHY use previous_response_id?**
+- GPT-5 reasoning models break problems down step-by-step, creating internal reasoning chains
+- When you pass previous_response_id, the model **AVOIDS RE-REASONING** the same concepts
+- This keeps interactions closer to the model's training distribution = **BETTER PERFORMANCE**
+- Essential for tool interactions that require multiple round trips
+
+**HOW to use previous_response_id:**
 - Each gpt_websearch response includes an "id" field (e.g., "resp_68a243e0341c81958fe34a474cdd57bb07db1800de6fc799")
-- REMEMBER this ID from each search response
-- For follow-up questions or clarifications about the same topic, use the "previous_response_id" parameter
-- This maintains conversation context and improves answer quality
-- Only use previous_response_id when the follow-up is directly related to the previous search
+- **ALWAYS REMEMBER** this ID from each search response
+- For follow-up questions, clarifications, or related searches about the same topic, **USE the previous_response_id**
+- This maintains conversation context, avoids duplicate reasoning, and improves answer quality
+
+**WHEN to use previous_response_id:**
+- ✅ Follow-up questions about the same search results
+- ✅ Asking for clarification or more detail on previous findings  
+- ✅ Building on previous research with related questions
+- ✅ Requesting different formats/perspectives of the same information
+- ❌ Completely unrelated new topics or searches
+
+**Performance Impact:**
+- WITH previous_response_id: Faster responses, better context, avoids re-reasoning
+- WITHOUT previous_response_id: Slower, may re-analyze concepts already covered
 
 ## Parameter Selection Strategy:
 CHOOSE OPTIMAL COMBINATIONS for cost-effectiveness and performance:
@@ -85,15 +102,16 @@ CHOOSE OPTIMAL COMBINATIONS for cost-effectiveness and performance:
 - Use when: Explanations needed, tutorials, comprehensive understanding
 
 ## Search Strategy:
-1. ANALYZE the user's question and determine appropriate model/effort/verbosity combination
-2. FORMULATE detailed, specific search queries (expand beyond the original question with context and specifics)
-3. DECIDE on search approach:
+1. **ANALYZE** the user's question and determine appropriate model/effort/verbosity combination
+2. **CHECK** if this relates to a previous search - if yes, **USE previous_response_id** to avoid re-reasoning
+3. **FORMULATE** detailed, specific search queries (expand beyond the original question with context and specifics)
+4. **DECIDE** on search approach:
    - Single comprehensive search: When question can be fully addressed in one query
-   - Sequential searches: When answers build on each other or need follow-up
+   - Sequential searches: When answers build on each other or need follow-up (**remember to pass previous_response_id between related searches**)
    - Parallel searches: When covering different aspects of the same topic
-4. SELECT appropriate parameters based on the guidance above
-5. If this is a follow-up to a previous search, include the previous_response_id
-6. SYNTHESIZE results into a comprehensive, coherent answer
+5. **SELECT** appropriate parameters based on the guidance above
+6. **EXECUTE** search with optimal parameters - **ALWAYS capture the response ID from results**
+7. **SYNTHESIZE** results into a comprehensive, coherent answer
 
 ## Query Formulation Guidelines:
 - Expand user questions with conversation context and specifics
@@ -106,7 +124,15 @@ CHOOSE OPTIMAL COMBINATIONS for cost-effectiveness and performance:
 - Be cost-conscious: use the simplest model that can handle the complexity
 - You may need multiple searches for comprehensive coverage
 - Always address the original user question completely
-- Remember and use response IDs for conversation continuity when appropriate
+- **CRITICAL**: Always capture and remember response IDs from each search
+- **PERFORMANCE**: Use previous_response_id for related follow-ups to avoid re-reasoning and improve speed
+- Response continuity is especially important when using multiple related searches
+
+## Best Practices:
+- Start each search by checking if it relates to previous searches
+- For multi-search strategies, chain the response IDs to maintain reasoning continuity
+- When clarifying or expanding on previous results, always use the previous_response_id
+- Remember: Better performance comes from avoiding duplicate reasoning through proper ID usage
 
 Now use the gpt_websearch tool strategically to answer the user's question.`
 
@@ -145,7 +171,7 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 				mcp.Enum("low", "medium", "high"),
 			),
 			mcp.WithString("previous_response_id",
-				mcp.Description("Optional: Previous response ID for conversation continuity"),
+				mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
 			),
 		),
 		webSearchHandler(cfg.APIKey, cfg.BaseURL),
