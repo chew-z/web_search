@@ -140,13 +140,14 @@ func runCLI() {
 	*effort = validateEffort(*effort)
 	*verbosity = validateVerbosity(*verbosity)
 
-	// If timeout wasn't explicitly set, use effort-based timeout
-	if !envCfg.HasTimeout {
-		flag.Visit(func(f *flag.Flag) {
-			if f.Name == "timeout" {
-				return // User set it explicitly
-			}
-		})
+	// Only override timeout if neither env nor CLI provided it
+	var timeoutFlagSet bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "timeout" {
+			timeoutFlagSet = true
+		}
+	})
+	if !envCfg.HasTimeout && !timeoutFlagSet {
 		*timeout = getTimeoutForEffort(*effort)
 	}
 

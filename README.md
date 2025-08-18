@@ -45,7 +45,7 @@ Create a `.env` file in the project root:
 ```env
 OPENAI_API_KEY=your-api-key-here
 MODEL=gpt-5-mini         # Optional: gpt-5-mini (default), gpt-5, gpt-5-nano
-EFFORT=low               # Optional: reasoning effort (low/medium/high)
+EFFORT=low               # Optional: reasoning effort (low/medium/high, default: medium)
 SHOW_ALL=false           # Optional: show raw JSON
 QUESTION=                # Optional: default question
 ```
@@ -56,6 +56,7 @@ QUESTION=                # Optional: default question
 - `gpt-5`: Complex analysis, coding questions, reasoning tasks
 
 **Effort-Based Timeouts**: `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes.
+Tip: Use `low` for quicker answers when speed matters.
 
 ## Usage
 
@@ -144,7 +145,7 @@ Performs intelligent web searches with cost-effective model selection and conver
 |-----------|------|----------|---------|-------------|
 | `query` | string | Yes | - | The search query or question |
 | `model` | string | No | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano |
-| `reasoning_effort` | string | No | `low` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
+| `reasoning_effort` | string | No | `medium` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
 | `previous_response_id` | string | No | - | Previous response ID for conversation continuity |
 
 ### Prompt: `web_search`
@@ -219,7 +220,7 @@ answer [options] [question]
 Options:
   -q, -question    Question to ask (required, can also use positional argument)
   -model          Model: gpt-5-mini (default), gpt-5, gpt-5-nano
-  -effort         Reasoning effort: low (3min), medium (5min), high (10min timeout)
+  -effort         Reasoning effort: low (3min), medium (5min), high (10min timeout) (default: medium)
   -timeout        Request timeout (overrides effort-based defaults)
   -show-all       Show raw JSON response
   -base           API endpoint URL
