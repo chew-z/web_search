@@ -6,6 +6,7 @@ go.sum
 
 .aider*
 .claude/**
+.codex/**
 .gemini/**
 .vscode/**
 .repomix/**
