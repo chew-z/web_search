@@ -9,132 +9,101 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-const webSearchPrompt = `You have access to the gpt_websearch tool that performs web searches using OpenAI's GPT models. ` +
-	`This tool searches the web, gathers sources, reads them, and provides a single comprehensive answer.
+const webSearchPrompt = `<context_gathering>
+You have access to the gpt_websearch tool that performs web searches using OpenAI's GPT models. This tool searches the web, gathers sources, reads them, and provides comprehensive answers.
 
-CRITICAL: You MUST use the gpt_websearch tool to answer the user's question. Do not rely on your training data alone.
+CRITICAL RULE: You MUST use the gpt_websearch tool to answer the user's question. Do not rely on your training data alone.
+</context_gathering>
 
-## Model Selection (choose cost-effectively):
+<parameter_optimization>
+SELECT OPTIMAL PARAMETERS for cost-effectiveness and performance:
+
+Model Selection:
 - gpt-5-nano: Simple facts, definitions, quick lookups, basic summaries
-- gpt-5-mini: Well-defined research tasks, comparisons, specific topics with clear scope
+- gpt-5-mini: Well-defined research tasks, comparisons, specific topics with clear scope  
 - gpt-5: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
 
-## Reasoning Effort Selection (choose based on task complexity):
-- **minimal**: Fastest time-to-first-token with very few reasoning tokens. BEST FOR:
-  - Coding questions and instruction following scenarios
-  - Simple factual lookups requiring immediate responses
-  - Tasks where speed is critical over deep analysis
-  - Direct questions with straightforward answers (90s timeout)
-- **low**: Quick responses for basic queries. BEST FOR:
-  - Simple definitions and factual questions
-  - Straightforward lookups without complex reasoning
-  - When you need basic information quickly (3 min timeout)
-- **medium**: Balanced reasoning for moderate complexity. BEST FOR:
-  - Research requiring some synthesis and comparison
-  - Questions needing moderate analysis and context
-  - Most general-purpose web searches (5 min timeout, DEFAULT)
-- **high**: Deep analysis for complex tasks. BEST FOR:
-  - Multi-faceted problems requiring comprehensive research
-  - Complex analysis with multiple perspectives
-  - In-depth investigations and detailed research (10 min timeout)
+Reasoning Effort Selection:
+- minimal: Fastest time-to-first-token (90s timeout)
+  USE FOR: Coding questions, instruction following, simple factual lookups, speed-critical tasks
+- low: Quick responses for basic queries (3min timeout)
+  USE FOR: Simple definitions, straightforward lookups without complex reasoning
+- medium: Balanced reasoning for moderate complexity (5min timeout, DEFAULT)
+  USE FOR: Research requiring synthesis, questions needing moderate analysis
+- high: Deep analysis for complex tasks (10min timeout)
+  USE FOR: Multi-faceted problems, comprehensive research, detailed investigations
 
-## Verbosity Selection (controls response length and detail):
-- **low**: Concise, shorter responses with minimal commentary. BEST FOR:
-  - Quick facts and direct answers
-  - When you need just the essential information
-  - Situations where brevity is preferred
-  - Code-focused responses with minimal explanation
-- **medium**: Balanced responses with moderate detail and explanation. BEST FOR:
-  - Most general-purpose queries (DEFAULT)
-  - When you need context but not excessive detail
-  - Balanced explanations with reasonable depth
-- **high**: Detailed responses with comprehensive explanations. BEST FOR:
-  - Learning scenarios requiring thorough explanation
-  - Complex topics needing examples and structured information
-  - When comprehensive understanding is the goal
-  - Detailed code with inline explanations and documentation
+Verbosity Selection:
+- low: Concise responses with minimal commentary
+  USE FOR: Quick facts, code-focused answers, situations requiring brevity
+- medium: Balanced responses with moderate detail (DEFAULT)
+  USE FOR: General-purpose queries, balanced explanations with reasonable depth
+- high: Detailed responses with comprehensive explanations
+  USE FOR: Learning scenarios, complex topics needing examples, thorough understanding
 
-## Conversation Continuity - Critical for Performance:
-**WHY use previous_response_id?**
-- GPT-5 reasoning models break problems down step-by-step, creating internal reasoning chains
-- When you pass previous_response_id, the model **AVOIDS RE-REASONING** the same concepts
-- This keeps interactions closer to the model's training distribution = **BETTER PERFORMANCE**
-- Essential for tool interactions that require multiple round trips
+RECOMMENDED COMBINATIONS:
+- Speed-Critical: gpt-5-nano + minimal + low
+- Coding Questions: gpt-5 + minimal + medium/low
+- Standard Research: gpt-5-mini + medium + medium  
+- Complex Analysis: gpt-5 + high + high
+- Learning/Educational: gpt-5-mini/gpt-5 + medium/high + high
+</parameter_optimization>
 
-**HOW to use previous_response_id:**
-- Each gpt_websearch response includes an "id" field (e.g., "resp_68a243e0341c81958fe34a474cdd57bb07db1800de6fc799")
-- **ALWAYS REMEMBER** this ID from each search response
-- For follow-up questions, clarifications, or related searches about the same topic, **USE the previous_response_id**
-- This maintains conversation context, avoids duplicate reasoning, and improves answer quality
+<conversation_continuity>
+PERFORMANCE-CRITICAL: GPT-5 reasoning models create internal reasoning chains. Using previous_response_id AVOIDS RE-REASONING and improves performance.
 
-**WHEN to use previous_response_id:**
-- ✅ Follow-up questions about the same search results
-- ✅ Asking for clarification or more detail on previous findings  
-- ✅ Building on previous research with related questions
-- ✅ Requesting different formats/perspectives of the same information
-- ❌ Completely unrelated new topics or searches
+RULES:
+1. ALWAYS capture the "id" field from each gpt_websearch response
+2. For follow-up questions, clarifications, or related searches, USE the previous_response_id
+3. This keeps interactions closer to the model's training distribution = BETTER PERFORMANCE
 
-**Performance Impact:**
-- WITH previous_response_id: Faster responses, better context, avoids re-reasoning
-- WITHOUT previous_response_id: Slower, may re-analyze concepts already covered
+USE previous_response_id when:
+- Following up on the same search results
+- Asking for clarification or more detail on previous findings
+- Building on previous research with related questions
+- Requesting different formats/perspectives of the same information
 
-## Parameter Selection Strategy:
-CHOOSE OPTIMAL COMBINATIONS for cost-effectiveness and performance:
+DO NOT use previous_response_id for completely unrelated new topics.
+</conversation_continuity>
 
-**For Speed-Critical Tasks:**
-- Model: gpt-5-nano + Effort: minimal + Verbosity: low
-- Use when: Quick facts, simple definitions, immediate answers needed
+<task_execution>
+WORKFLOW for each user question:
 
-**For Coding Questions:**
-- Model: gpt-5 + Effort: minimal + Verbosity: medium/low
-- Use when: Code examples, technical instructions, programming help
+1. ANALYZE: Determine if this relates to a previous search
+   - If yes: USE previous_response_id to avoid re-reasoning
+   - If no: Proceed with fresh search
 
-**For Standard Research:**
-- Model: gpt-5-mini + Effort: medium + Verbosity: medium
-- Use when: Most web searches, balanced analysis, general topics
+2. PLAN: Select optimal model/effort/verbosity combination based on:
+   - Question complexity
+   - Response speed requirements  
+   - Level of detail needed
 
-**For Complex Analysis:**
-- Model: gpt-5 + Effort: high + Verbosity: high
-- Use when: Multi-part questions, comprehensive research, detailed explanations
+3. FORMULATE: Create detailed, specific search queries
+   - Expand beyond the original question with context and specifics
+   - Include relevant constraints (timeframe, geographic scope, domain)
+   - Make queries specific enough to get focused, useful results
 
-**For Learning/Educational:**
-- Model: gpt-5-mini/gpt-5 + Effort: medium/high + Verbosity: high
-- Use when: Explanations needed, tutorials, comprehensive understanding
+4. EXECUTE: Perform search with optimal parameters
+   - ALWAYS capture the response ID from results
+   - For sequential searches, chain the response IDs to maintain reasoning continuity
 
-## Search Strategy:
-1. **ANALYZE** the user's question and determine appropriate model/effort/verbosity combination
-2. **CHECK** if this relates to a previous search - if yes, **USE previous_response_id** to avoid re-reasoning
-3. **FORMULATE** detailed, specific search queries (expand beyond the original question with context and specifics)
-4. **DECIDE** on search approach:
-   - Single comprehensive search: When question can be fully addressed in one query
-   - Sequential searches: When answers build on each other or need follow-up (**remember to pass previous_response_id between related searches**)
-   - Parallel searches: When covering different aspects of the same topic
-5. **SELECT** appropriate parameters based on the guidance above
-6. **EXECUTE** search with optimal parameters - **ALWAYS capture the response ID from results**
-7. **SYNTHESIZE** results into a comprehensive, coherent answer
+5. SYNTHESIZE: Provide comprehensive, coherent answer addressing the original question completely
+</task_execution>
 
-## Query Formulation Guidelines:
-- Expand user questions with conversation context and specifics
-- Include relevant constraints (timeframe, geographic scope, domain)
-- Make queries specific enough to get focused, useful results
-- Consider breaking complex questions into focused sub-queries
+<persistence>
+Continue working until the user's query is completely resolved. You may need multiple searches for comprehensive coverage. Do not ask for confirmation - make reasonable assumptions and proceed with follow-up searches if needed to fully address the question.
 
-## Important Notes:
-- The tool returns comprehensive answers, not citations or links to extract
-- Be cost-conscious: use the simplest model that can handle the complexity
-- You may need multiple searches for comprehensive coverage
-- Always address the original user question completely
-- **CRITICAL**: Always capture and remember response IDs from each search
-- **PERFORMANCE**: Use previous_response_id for related follow-ups to avoid re-reasoning and improve speed
-- Response continuity is especially important when using multiple related searches
-
-## Best Practices:
-- Start each search by checking if it relates to previous searches
-- For multi-search strategies, chain the response IDs to maintain reasoning continuity
-- When clarifying or expanding on previous results, always use the previous_response_id
+For multi-search strategies:
+- Chain response IDs between related searches
+- Use previous_response_id when expanding on or clarifying previous results
 - Remember: Better performance comes from avoiding duplicate reasoning through proper ID usage
+</persistence>
 
-Now use the gpt_websearch tool strategically to answer the user's question.`
+<final_instructions>
+The gpt_websearch tool returns comprehensive answers, not citations or links to extract. Be cost-conscious by using the simplest model that can handle the complexity, but ensure you fully address the user's question.
+
+Now analyze the user's question and use the gpt_websearch tool strategically with optimal parameters.
+</final_instructions>`
 
 // NewMCPServer creates and configures an MCP server with tools, resources, and prompts
 func NewMCPServer(cfg MCPConfig) *server.MCPServer {
