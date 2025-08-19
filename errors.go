@@ -9,6 +9,7 @@ import (
 var (
 	// Configuration errors
 	ErrNoAPIKey = errors.New("OPENAI_API_KEY environment variable is required")
+)
 
 // APIError represents an error from the OpenAI API
 type APIError struct {

@@ -14,6 +14,9 @@ import (
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
 func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration, useWebSearch bool) (*apiResponse, error) {
+	if apiKey == "" {
+		return nil, ErrNoAPIKey
+	}
 	body := requestBody{
 		Model: model,
 		Input: query,
@@ -71,6 +74,9 @@ func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosi
 
 // ExtractAnswer extracts the answer text from the API response
 func ExtractAnswer(apiResp *apiResponse) string {
+	if apiResp == nil {
+		return ""
+	}
 	var answers []string
 	for _, item := range apiResp.Output {
 		if item.Type != "message" {
