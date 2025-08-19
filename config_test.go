@@ -8,15 +8,15 @@ import (
 
 func TestLoadEnvConfig_Table(t *testing.T) {
 	type want struct {
-		err         error
-		apiKey      string
-		question    string
-		model       string
-		effort      string
-		showAll     bool
-		hasShowAll  bool
-		timeout     time.Duration
-		hasTimeout  bool
+		err        error
+		apiKey     string
+		question   string
+		model      string
+		effort     string
+		showAll    bool
+		hasShowAll bool
+		timeout    time.Duration
+		hasTimeout bool
 	}
 
 	tests := []struct {

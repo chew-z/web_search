@@ -118,7 +118,7 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 		t.Errorf("expected ID 'test-id', got %s", apiResp.ID)
 	}
 	if apiResp.Reasoning.Effort != "test-effort" {
-			t.Errorf("expected effort 'test-effort', got %s", apiResp.Reasoning.Effort)
+		t.Errorf("expected effort 'test-effort', got %s", apiResp.Reasoning.Effort)
 	}
 	if len(apiResp.Output) == 0 || len(apiResp.Output[0].Content) == 0 || apiResp.Output[0].Content[0].Text != "test response" {
 		t.Errorf("expected output text 'test response', got %+v", apiResp.Output)
@@ -337,14 +337,14 @@ func TestExtractAnswer(t *testing.T) {
 					{
 						Type: "message",
 						Content: []respContent{
-							{Type: "output_text", Text: "Text content."}, 
+							{Type: "output_text", Text: "Text content."},
 							{Type: "image", Text: "base64image"},
 						},
 					},
 					{
 						Type: "tool_code",
 						Content: []respContent{
-							{Type: "output_text", Text: "Should be ignored."}, 
+							{Type: "output_text", Text: "Should be ignored."},
 						},
 					},
 				},
