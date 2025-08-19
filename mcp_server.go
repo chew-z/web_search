@@ -57,10 +57,9 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 			mcp.WithString("previous_response_id",
 				mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
 			),
-			mcp.WithString("web_search",
-				mcp.DefaultString("auto"),
-				mcp.Description("Web search mode: auto (smart detection), always (force on), never (force off)"),
-				mcp.Enum("auto", "always", "never"),
+			mcp.WithBoolean("web_search",
+				mcp.DefaultBool(true),
+				mcp.Description("Use web search (default: true)"),
 			),
 		),
 		webSearchHandler(cfg.APIKey, cfg.BaseURL),
@@ -106,10 +105,10 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		effort := request.GetString("reasoning_effort", defaultEffort)
 		verbosity := request.GetString("verbosity", defaultVerbosity)
 		previousResponseID := request.GetString("previous_response_id", "")
-		webSearchMode := request.GetString("web_search", "auto")
+		webSearch := request.GetBool("web_search", true)
 
 		// Log the search request
-		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%s'", query, model, effort, verbosity, webSearchMode))
+		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%t'", query, model, effort, verbosity, webSearch))
 
 		// Call handler with properly extracted values
 		args := map[string]interface{}{
@@ -118,7 +117,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			"reasoning_effort":     effort,
 			"verbosity":            verbosity,
 			"previous_response_id": previousResponseID,
-			"web_search":           webSearchMode,
+			"web_search":           webSearch,
 		}
 
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)

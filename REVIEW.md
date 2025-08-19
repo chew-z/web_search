@@ -1,187 +1,77 @@
-# MCP Server Implementation Review
+Here’s a focused review of the Answer CLI/MCP project: what’s solid, what to fix, and clear next steps.
 
-## Analysis of Your MCP Server Implementation
+**Overall**
+- Clean, idiomatic Go with clear separation of concerns (CLI vs MCP, config, API, transport).
+- Dual-mode entry and MCP surface are well-structured and easy to extend.
+- Uses godotenv/autoload smartly, consistent flag/env precedence, and effort-based timeouts.
 
-Based on the MCP documentation and your code, here's my comprehensive review:
+**Strengths**
+- CLI flow: sensible defaults, tri-state `-web-search` with “auto” backed by a heuristic.
+- MCP server: proper tool schema, structured results via `NewToolResultStructuredOnly`, centralized client logging.
+- Error handling: `APIError` type, `%w` wrapping, clear `fail()` path for CLI.
+- Prompting: comprehensive web search prompt template; response ID continuity is exposed.
 
-### ✅ **Strengths of Your Implementation**
+**Key Issues**
+- go.mod version mismatch: `go 1.25.0` while README says “Go 1.24.0 or later”. Align both.
+- .gitignore problems:
+  - Ignores `go.sum` (should be versioned for reproducible builds).
+  - Pattern `test_*` risks ignoring test artifacts anywhere (including `tests/test_logging.py`).
+- Missing docs: README references `MCP_SERVER.md` and a LICENSE file; neither exists.
+- Lint/format scripts are machine-specific:
+  - `run_lint.sh` hardcodes `/Users/rrj/.../golangci-lint`.
+  - `run_format.sh` hardcodes `/usr/local/go/bin/gofmt`.
+- HTTP binding: `Start(fmt.Sprintf(":%s", port))` binds to all interfaces. This contradicts repo guidance to avoid public interfaces by default.
+- Default web-search heuristic: `ShouldUseWebSearch` returns true by default, which may cause unexpected web search calls/costs in “auto” mode.
+- Unused sentinels: `ErrInvalidEffort`, `ErrSessionNotFound`, `ErrNotificationFailed` (likely to fail `golangci-lint`).
+- Module path: `module Answer` is local; README suggests `go install .` but not a usable remote import path.
 
-1. **Dual Transport Support**: You've correctly implemented both STDIO and HTTP/SSE transports as recommended by the docs:
-   - STDIO for Claude Desktop integration
-   - HTTP/SSE for web-based clients
+**Recommended Changes**
+- Build/versions:
+  - Pick a single Go version (e.g., 1.23/1.24) and make README + go.mod consistent.
+  - Commit `go.sum`; remove it from `.gitignore`.
+- .gitignore:
+  - Remove `go.sum` and `test_*` patterns.
+  - Add `repomix-output.xml` (or move it outside the repo).
+- Scripts:
+  - `run_lint.sh`: use `golangci-lint run --fix ./...` and rely on PATH; remove hardcoded paths.
+  - `run_format.sh`: use `gofmt -w .` on PATH.
+- HTTP transport:
+  - Bind to `127.0.0.1` by default. Add a `-host` flag (default `127.0.0.1`) to opt-in to other interfaces.
+- CLI/MCP polish:
+  - Consider a CLI flag for `previous_response_id` to expose continuity in CLI mode.
+  - Revisit `ShouldUseWebSearch`: make default false or tighten indicators to reduce accidental usage.
+- Docs:
+  - Either add `MCP_SERVER.md` (endpoints, examples, prompt design) or remove references in README.
+  - Add LICENSE or remove the README section.
+  - Fix README HTTP endpoint list to precisely match `mcp-go`’s Streamable HTTP routes (e.g., ensure documented paths exist).
+- Code hygiene:
+  - Remove unused error vars or use them.
+  - Consider returning structured MCP errors for tool failures (code/message/details).
+  - Optionally split MCP prompt into system + user messages for clarity.
 
-2. **Well-Structured Architecture**:
-   - Clean separation of concerns (transport, server logic, API integration)
-   - Dual-mode design (CLI + MCP server) is elegant
-   - Good error handling with custom error types
+**Suggested Tests**
+- `api_test.go`:
+  - `TestExtractAnswer` with various `apiResponse` shapes (single/multi message segments; no text).
+  - `TestShouldUseWebSearch` covering current/search/knowledge patterns and default behavior.
+- `http_test.go`:
+  - Use `httptest.Server` to validate `CallAPI` happy-path and non-2xx handling (`APIError`).
+- MCP smoke:
+  - If keeping a Python helper, add `tests/test_logging.py` and ensure `.gitignore` doesn’t filter it.
 
-3. **Tool Implementation**:
-   - Your `gpt_websearch` tool follows MCP patterns correctly
-   - Proper input schema with required/optional parameters
-   - Good parameter validation
+**Security & Reliability**
+- Avoid binding HTTP to public interfaces by default.
+- Logging currently avoids secrets; keep `APIError.Body` but be aware it can contain server messages (fine for dev).
+- Consider HTTP server read/write timeouts if the underlying `mcp-go` HTTP server allows configuration.
 
-4. **Resource Implementation**:
-   - Simple but effective `server-info` resource
-   - Follows MCP resource patterns
+**Quick Wins**
+- Update `.gitignore` (stop ignoring `go.sum`, `test_*`).
+- Add missing docs (MCP_SERVER.md, LICENSE) or fix README links.
+- Make scripts path-agnostic.
+- Bind HTTP to `127.0.0.1` by default.
+- Align Go version across README and go.mod.
 
-### 🔧 **Areas for Enhancement Based on MCP Documentation**
-
-1. **Prompt Implementation** - While functional, could be enhanced:
-   ```go
-   // Current: Single prompt with embedded instructions
-   // Consider: Separate system vs user prompts for better structure
-   
-   // Enhanced version:
-   messages := []mcp.PromptMessage{
-       {
-           Role: "system",
-           Content: mcp.TextContent{
-               Type: "text",
-               Text: systemInstructions, // Move the tool usage instructions here
-           },
-       },
-       {
-           Role: "user", 
-           Content: mcp.TextContent{
-               Type: "text",
-               Text: userQuestion,
-           },
-       },
-   }
-   ```
-
-2. **HTTP Transport Enhancements**:
-   Based on the HTTP transport docs, you could add:
-   - Authentication middleware
-   - Rate limiting
-   - CORS headers for web clients
-   - More standard MCP endpoints
-
-3. **Prompt Templates**: The docs show advanced prompt patterns you could leverage:
-   ```go
-   // Add multiple prompt templates for different use cases
-   mcpServer.AddPrompt(mcp.Prompt{
-       Name: "quick_facts",
-       Description: "Optimized for simple factual queries",
-       Arguments: []mcp.PromptArgument{...},
-   }, quickFactsHandler)
-   
-   mcpServer.AddPrompt(mcp.Prompt{
-       Name: "deep_research", 
-       Description: "For complex multi-part research",
-       Arguments: []mcp.PromptArgument{...},
-   }, deepResearchHandler)
-   ```
-
-4. **Session Management**: For the HTTP transport, consider adding:
-   ```go
-   // Stateless mode for better scalability
-   sseServer := server.NewSSEServer(mcpServer,
-       server.WithStateless(true),
-   )
-   ```
-
-5. **Additional Resources**: Consider exposing more resources:
-   ```go
-   // Model capabilities resource
-   mcpServer.AddResource(mcp.Resource{
-       URI:         "models/capabilities",
-       Name:        "Model Capabilities",
-       Description: "Available models and their capabilities",
-   }, modelsHandler)
-   
-   // Search history resource (if you track it)
-   mcpServer.AddResource(mcp.Resource{
-       URI:         "history/recent",
-       Name:        "Recent Searches",
-       Description: "Recent search queries and results",
-   }, historyHandler)
-   ```
-
-### 📝 **Specific Suggestions**
-
-1. **Enhanced Error Responses** for MCP:
-   ```go
-   // Instead of simple error strings, provide structured errors
-   type MCPError struct {
-       Code    string `json:"code"`
-       Message string `json:"message"`
-       Details map[string]interface{} `json:"details,omitempty"`
-   }
-   ```
-
-2. **Tool Progress Notifications** (for long-running searches):
-   ```go
-   // Use MCP's notification system for progress updates
-   mcpServer.SendNotification("progress", map[string]interface{}{
-       "tool": "gpt_websearch",
-       "status": "searching",
-       "progress": 0.5,
-   })
-   ```
-
-3. **HTTP Endpoint Documentation**:
-   Your HTML documentation is good, but consider adding:
-   - OpenAPI/Swagger spec
-   - Example requests/responses
-   - Authentication details (when added)
-
-4. **Prompt Argument Validation**:
-   ```go
-   // Add more sophisticated argument validation
-   Arguments: []mcp.PromptArgument{
-       {
-           Name:        "user_question",
-           Description: "The question to answer",
-           Required:    true,
-           Schema: map[string]interface{}{
-               "type": "string",
-               "minLength": 1,
-               "maxLength": 1000,
-           },
-       },
-   }
-   ```
-
-### 🎯 **Key Recommendations**
-
-1. **Leverage MCP Capabilities**: Your implementation is solid but conservative. The MCP framework supports more advanced features like:
-   - Dynamic prompt generation based on context
-   - Resource subscriptions for real-time updates
-   - Tool composition (tools calling other tools)
-
-2. **Consider Middleware Pattern** for HTTP:
-   ```go
-   // Add middleware chain for HTTP transport
-   handler := middleware.Chain(
-       middleware.Logger,
-       middleware.RateLimit(100),
-       middleware.Auth(apiKeyValidator),
-   )(sseServer.SSEHandler())
-   ```
-
-3. **Add Telemetry/Metrics**:
-   - Track tool usage
-   - Monitor response times
-   - Log error rates
-
-### 📋 **MCP Documentation Insights**
-
-#### Prompts (from https://mcp-go.dev/servers/prompts)
-- **Prompt Fundamentals**: Reusable interaction templates for structuring LLM conversations
-- **Key Components**: Support for required/optional arguments, defaults, constraints
-- **Message Types**: Multi-message conversations with system/user/assistant roles
-- **Advanced Patterns**: Embedded resources, conditional prompts, template-based prompts
-
-#### HTTP Transport (from https://mcp-go.dev/transports/http)
-- **StreamableHTTP Transport**: Provides REST-like interactions for MCP servers
-- **Use Cases**: Microservices, public APIs, gateway integration, cached services
-- **Standard Endpoints**: `/mcp/initialize`, `/mcp/tools/list`, `/mcp/tools/call`, `/mcp/resources/list`, `/mcp/health`
-- **Configuration**: Custom endpoints, heartbeat intervals, stateless/stateful modes
-- **Authentication**: JWT-based middleware examples provided
-
-## Summary
-
-Your implementation is well-structured and follows MCP patterns correctly. The main opportunities are in leveraging more advanced MCP features and adding production-ready concerns like authentication, rate limiting, and observability for the HTTP transport.
-
-The code demonstrates a solid understanding of the MCP protocol and provides a clean, maintainable foundation for a web search service. The dual CLI/MCP mode is particularly elegant and provides good flexibility for different usage patterns.
+If you want, I can draft concrete patches for:
+- .gitignore cleanup and script fixes.
+- Adding a `-host` flag and localhost default bind.
+- Unit tests for `ExtractAnswer` and `ShouldUseWebSearch`.
+- README corrections (versions, endpoints, missing files).

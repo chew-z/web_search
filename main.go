@@ -101,7 +101,7 @@ func runCLI() {
 			return defaultEffort
 		}(), "effort (env EFFORT)")
 		verbosity   = flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
-		webSearch   = flag.String("web-search", "auto", "web search mode: auto (smart detection), always (force on), never (force off)")
+		webSearch   = flag.Bool("web-search", true, "use web search (default: true)")
 		questionVal string
 		timeout     = flag.Duration("timeout", func() time.Duration {
 			if envCfg.HasTimeout {
@@ -141,18 +141,8 @@ func runCLI() {
 	*effort = validateEffort(*effort)
 	*verbosity = validateVerbosity(*verbosity)
 
-	// Validate web search mode
-	var useWebSearch bool
-	switch *webSearch {
-	case "always":
-		useWebSearch = true
-	case "never":
-		useWebSearch = false
-	case "auto", "":
-		useWebSearch = ShouldUseWebSearch(q)
-	default:
-		fail(2, fmt.Sprintf("invalid web-search mode: %s (use 'auto', 'always', or 'never')", *webSearch))
-	}
+	// Use web search flag directly
+	useWebSearch := *webSearch
 
 	// Only override timeout if neither env nor CLI provided it
 	var timeoutFlagSet bool

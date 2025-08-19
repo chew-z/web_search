@@ -33,12 +33,19 @@ Verbosity Selection:
 - high: Detailed responses with comprehensive explanations
   USE FOR: Learning scenarios, complex topics needing examples, thorough understanding
 
+Web Search Control:
+- web_search: true (DEFAULT) - Enables web search for current information
+  USE FOR: All new questions, research queries, fact-checking, current events
+- web_search: false - Disables web search, uses model knowledge only
+  USE FOR: Clarification requests in continued conversations, formatting changes, follow-up questions about already-retrieved information
+
 RECOMMENDED COMBINATIONS:
-- Speed-Critical: gpt-5-nano + minimal + low
-- Coding Questions: gpt-5 + minimal + medium/low
-- Standard Research: gpt-5-mini + medium + medium  
-- Complex Analysis: gpt-5 + high + high
-- Learning/Educational: gpt-5-mini/gpt-5 + medium/high + high
+- Speed-Critical: gpt-5-nano + minimal + low + web_search=true
+- Coding Questions: gpt-5 + minimal + medium/low + web_search=true
+- Standard Research: gpt-5-mini + medium + medium + web_search=true
+- Complex Analysis: gpt-5 + high + high + web_search=true
+- Learning/Educational: gpt-5-mini/gpt-5 + medium/high + high + web_search=true
+- Clarification/Follow-up: any model + any effort + any verbosity + web_search=false
 </parameter_optimization>
 
 <conversation_continuity>
@@ -55,6 +62,11 @@ USE previous_response_id when:
 - Building on previous research with related questions
 - Requesting different formats/perspectives of the same information
 
+USE previous_response_id + web_search=false when:
+- User asks for clarification of already-retrieved information
+- User requests reformatting or different presentation of existing results
+- User asks follow-up questions that can be answered from previous search results
+
 DO NOT use previous_response_id for completely unrelated new topics.
 </conversation_continuity>
 
@@ -65,21 +77,25 @@ WORKFLOW for each user question:
    - If yes: USE previous_response_id to avoid re-reasoning
    - If no: Proceed with fresh search
 
-2. PLAN: Select optimal model/effort/verbosity combination based on:
+2. DECIDE WEB SEARCH: Determine if web search is needed
+   - web_search=true (DEFAULT): For new questions, research, current information
+   - web_search=false: Only for clarification of already-retrieved information
+
+3. PLAN: Select optimal model/effort/verbosity combination based on:
    - Question complexity
    - Response speed requirements  
    - Level of detail needed
 
-3. FORMULATE: Create detailed, specific search queries
+4. FORMULATE: Create detailed, specific search queries (if web_search=true)
    - Expand beyond the original question with context and specifics
    - Include relevant constraints (timeframe, geographic scope, domain)
    - Make queries specific enough to get focused, useful results
 
-4. EXECUTE: Perform search with optimal parameters
+5. EXECUTE: Perform search with optimal parameters
    - ALWAYS capture the response ID from results
    - For sequential searches, chain the response IDs to maintain reasoning continuity
 
-5. SYNTHESIZE: Provide comprehensive, coherent answer addressing the original question completely
+6. SYNTHESIZE: Provide comprehensive, coherent answer addressing the original question completely
 </task_execution>
 
 <persistence>
