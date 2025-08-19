@@ -42,12 +42,12 @@ The content is organized as follows:
 <directory_structure>
 .env.example
 .gitignore
+AGENTS.md
 api.go
 CLAUDE.md
 config.go
 errors.go
 go.mod
-IMPROVEMENTS.md
 main.go
 mcp_server.go
 prompts.go
@@ -62,115 +62,6 @@ transport.go
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="IMPROVEMENTS.md">
-# MCP Server Implementation Improvements
-
-## Summary
-This document outlines the improvements made to the Answer MCP server implementation to align with best practices and the latest `mcp-go` library API.
-
-## Changes Made
-
-### 1. Transport Layer Simplification (`transport.go`)
-
-#### Before (327 lines)
-- Unnecessarily complex implementation with goroutines, channels, and manual signal handling
-- Mixed SSE transport logic with HTTP transport naming
-- Manual HTTP server configuration and middleware
-- Reinvented functionality that the library already provided
-
-#### After (38 lines)
-```go
-// STDIO Transport - simplified to one line
-return server.ServeStdio(mcpServer)
-
-// HTTP Transport - using proper StreamableHTTP
-httpServer := server.NewStreamableHTTPServer(mcpServer)
-return httpServer.Start(addr)
-```
-
-#### Key Improvements:
-- ✅ Removed unnecessary goroutines and channel orchestration
-- ✅ Removed manual signal handling (library handles it)
-- ✅ Used `server.ServeStdio()` directly instead of wrapper logic
-- ✅ Used `StreamableHTTPServer` for proper HTTP transport
-- ✅ Removed SSE transport (as requested)
-- ✅ Removed custom middleware and HTML documentation
-- ✅ Let the library handle all protocol details internally
-
-### 2. MCP Server Configuration (`mcp_server.go`)
-
-#### Fixed API Usage:
-1. **Server Creation with Capabilities**
-   ```go
-   server.NewMCPServer(name, version,
-       server.WithToolCapabilities(true),
-       server.WithResourceCapabilities(true, false),
-       server.WithPromptCapabilities(true),
-   )
-   ```
-
-2. **Tool Definition Using Fluent API**
-   - Changed from direct struct initialization to `mcp.NewTool()` builder pattern
-   - Used proper helper methods: `mcp.Required()`, `mcp.DefaultString()`, `mcp.Enum()`
-   - Proper argument extraction: `request.RequireString()`, `request.GetString()`
-
-3. **Resource Using Fluent API**
-   - Changed to `mcp.NewResource()` with proper URI format
-   - Fixed return type (not pointer)
-
-4. **Prompt Using Correct API**
-   - Fixed from `mcp.WithPromptArgument` to `mcp.WithArgument`
-   - Used `mcp.RequiredArgument()` and `mcp.ArgumentDescription()`
-   - Fixed argument extraction (no type assertion needed)
-
-5. **Separated System and User Messages**
-   - Split combined prompt into proper system instructions and user message
-
-## Benefits
-
-### Code Quality
-- **90% reduction in transport code** (327 → 38 lines)
-- **Cleaner separation of concerns**
-- **Better alignment with library design**
-- **Reduced maintenance burden**
-
-### Reliability
-- **No custom lifecycle management** - library handles everything
-- **No race conditions** from manual goroutines
-- **Proper error handling** built into the library
-- **Graceful shutdown** handled automatically
-
-### Maintainability
-- **Following documented patterns** from mcp-go examples
-- **Using library APIs as intended**
-- **Future-proof** against library updates
-- **Clear and simple code**
-
-## Lessons Learned
-
-1. **Trust the library** - The `mcp-go` library provides simple, clean APIs that handle all complexity internally
-2. **Don't reinvent the wheel** - Avoid wrapping library functions unnecessarily
-3. **Use fluent APIs** - The builder pattern provides better type safety and cleaner code
-4. **Keep it simple** - The simplest solution is often the correct one
-
-## Testing
-
-After improvements:
-- ✅ Code compiles successfully
-- ✅ STDIO transport starts correctly
-- ✅ HTTP transport uses proper StreamableHTTP server
-- ✅ All tools, resources, and prompts properly registered
-
-## Next Steps
-
-Consider these additional enhancements based on MCP documentation:
-1. Add authentication middleware for HTTP transport
-2. Implement rate limiting
-3. Add more prompt templates for different use cases
-4. Implement progress notifications for long-running searches
-5. Add telemetry and metrics collection
-</file>
 
 <file path="prompts.go">
 package main
@@ -271,27 +162,6 @@ The gpt_websearch tool returns comprehensive answers, not citations or links to 
 
 Now analyze the user's question and use the gpt_websearch tool strategically with optimal parameters.
 </final_instructions>`
-</file>
-
-<file path="Release Notes.md">
-# Release Notes
-
-## v0.2.0 - 2025-08-18
-
-### 🎉 New Features
-- **Conversation Continuity**: Implemented conversation continuity for web searches, allowing for more context-aware interactions.
-- **Web Search Tool**: Added a web search tool and server functionality to the API.
-- **Logging**: Enabled and integrated client logging for better debugging and monitoring.
-- **Configuration**: The application now loads configuration from environment variables, providing more flexibility.
-- **CLI**: Added a Go CLI for interacting with the API.
-- **Default Model**: Set `gpt-5-mini` as the default model for all interactions.
-
-### 🔧 Improvements
-- **Prompt Engineering**: Refined and enhanced web search prompts for clarity, efficiency, and cost-effectiveness.
-- **Code Refactoring**: Simplified web search prompt construction and refactored the MCP server to use new library features, improving code quality and maintainability.
-
-### 📚 Documentation
-- Added and updated release notes.
 </file>
 
 <file path="REVIEW.md">
@@ -537,24 +407,6 @@ TIMEOUT="300s"
 OPENAI_API_KEY=""
 </file>
 
-<file path=".gitignore">
-.DS_Store
-bin/**
-.env
-go.sum
-*.log
-
-.aider*
-.claude/**
-.gemini/**
-.vscode/**
-.repomix/**
-
-repomix.config.json
-
-test_*
-</file>
-
 <file path="CLAUDE.md">
 # CLAUDE.md
 
@@ -696,6 +548,90 @@ func fail(code int, msg string) {
 }
 </file>
 
+<file path="Release Notes.md">
+# Release Notes
+
+## v0.2.0 - 2025-08-18
+
+### 🎉 New Features
+- **Conversation Continuity**: Implemented conversation continuity for web searches, allowing for more context-aware interactions.
+- **Web Search Tool**: Added a web search tool and server functionality to the API.
+- **Logging**: Enabled and integrated client logging for better debugging and monitoring.
+- **Configuration**: The application now loads configuration from environment variables, providing more flexibility.
+- **CLI**: Added a Go CLI for interacting with the API.
+- **Default Model**: Set `gpt-5-mini` as the default model for all interactions.
+
+### 🔧 Improvements
+- **Prompt Engineering**: Refined and enhanced web search prompts for clarity, efficiency, and cost-effectiveness.
+- **Code Refactoring**: Simplified web search prompt construction and refactored the MCP server to use new library features, improving code quality and maintainability.
+
+### 📚 Documentation
+- Added and updated release notes.
+</file>
+
+<file path=".gitignore">
+.DS_Store
+bin/**
+.env
+go.sum
+*.log
+
+.aider*
+.claude/**
+.codex/**
+.gemini/**
+.vscode/**
+.repomix/**
+
+repomix.config.json
+
+test_*
+</file>
+
+<file path="AGENTS.md">
+# Repository Guidelines
+
+## Project Structure & Modules
+- `main.go`: CLI entry; starts MCP (`stdio`/`http`).
+- `api.go`, `mcp_server.go`, `config.go`, `errors.go`, `prompts.go`, `transport.go`: core logic and server transport.
+- `bin/`: compiled binaries (e.g., `bin/answer`).
+- `tests/`: auxiliary scripts (e.g., `tests/test_logging.py`).
+- `.env`/`.env.example`: runtime configuration (never commit secrets).
+
+## Build, Test, Run
+- Build: `go build -o bin/answer .` — compile the CLI/MCP server.
+- Test (Go): `go test ./...` or `./run_test.sh` — run package tests.
+- Lint: `./run_lint.sh` — runs `golangci-lint` if installed.
+- Format: `./run_format.sh` or `go fmt ./...` — apply `gofmt`.
+- CLI example: `./bin/answer -q "Latest AI developments" -model gpt-5-mini`.
+- MCP (stdio): `./bin/answer mcp -t stdio`.
+- MCP (HTTP): `./bin/answer mcp -t http -port 8080`.
+
+## Coding Style & Naming
+- Follow standard Go conventions. Use `gofmt` and keep imports organized.
+- Indentation: tabs (default `gofmt`). Line length: be reasonable; wrap for readability.
+- Packages: lower case, no spaces (`websearch`, `config`).
+- Files: lower case with optional underscores (`mcp_server.go`).
+- Names: exported `CamelCase`, unexported `camelCase`. Avoid abbreviations unless idiomatic (`ID`, `URL`).
+- Errors: wrap with context; prefer `errors.Is/As` and sentinel errors in `errors.go`.
+
+## Testing Guidelines
+- Go tests co-located as `*_test.go`. Name tests `TestXxx` and keep them hermetic.
+- Python utility: `tests/test_logging.py` exercises MCP logging over stdio.
+  - Example: `python3 tests/test_logging.py` (requires built `bin/answer`).
+- Aim for coverage on public behavior and edge cases; avoid external network in unit tests.
+
+## Commit & PR Guidelines
+- Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Scope optional, e.g., `feat(websearch): add conversation continuity`.
+- PRs must include: concise description, motivation/linked issue, usage examples (commands), and any behavior changes.
+- Add screenshots or logs when relevant (e.g., MCP responses). Keep diffs focused; update README if flags/usage change.
+
+## Security & Config Tips
+- Required: `OPENAI_API_KEY` via environment or `.env`. Do not log secrets.
+- Prefer dependency updates via `go get -u` and verify `go.sum` changes are minimal.
+- For HTTP mode, validate inputs and avoid binding to public interfaces by default in development.
+</file>
+
 <file path="go.mod">
 module Answer
 
@@ -767,7 +703,7 @@ Create a `.env` file in the project root:
 ```env
 OPENAI_API_KEY=your-api-key-here
 MODEL=gpt-5-mini         # Optional: gpt-5-mini (default), gpt-5, gpt-5-nano
-EFFORT=low               # Optional: reasoning effort (low/medium/high)
+EFFORT=low               # Optional: reasoning effort (low/medium/high, default: medium)
 SHOW_ALL=false           # Optional: show raw JSON
 QUESTION=                # Optional: default question
 ```
@@ -778,6 +714,7 @@ QUESTION=                # Optional: default question
 - `gpt-5`: Complex analysis, coding questions, reasoning tasks
 
 **Effort-Based Timeouts**: `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes.
+Tip: Use `low` for quicker answers when speed matters.
 
 ## Usage
 
@@ -866,7 +803,7 @@ Performs intelligent web searches with cost-effective model selection and conver
 |-----------|------|----------|---------|-------------|
 | `query` | string | Yes | - | The search query or question |
 | `model` | string | No | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano |
-| `reasoning_effort` | string | No | `low` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
+| `reasoning_effort` | string | No | `medium` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
 | `previous_response_id` | string | No | - | Previous response ID for conversation continuity |
 
 ### Prompt: `web_search`
@@ -941,7 +878,7 @@ answer [options] [question]
 Options:
   -q, -question    Question to ask (required, can also use positional argument)
   -model          Model: gpt-5-mini (default), gpt-5, gpt-5-nano
-  -effort         Reasoning effort: low (3min), medium (5min), high (10min timeout)
+  -effort         Reasoning effort: low (3min), medium (5min), high (10min timeout) (default: medium)
   -timeout        Request timeout (overrides effort-based defaults)
   -show-all       Show raw JSON response
   -base           API endpoint URL
@@ -1106,189 +1043,6 @@ Please see [AGENTS.md](AGENTS.md) for development guidelines and contribution ru
 - [MCP Protocol Specification](https://modelcontextprotocol.io/)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [Detailed MCP Server Documentation](MCP_SERVER.md)
-</file>
-
-<file path="api.go">
-package main
-
-import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"time"
-
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
-)
-
-// CallAPI makes the actual API call - reusable for both CLI and MCP
-func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration) (*apiResponse, error) {
-	body := requestBody{
-		Model: model,
-		Input: query,
-		Reasoning: reqReasoning{
-			Effort: effort,
-		},
-		Text: reqText{
-			Verbosity: verbosity,
-		},
-		Tools: []reqTool{
-			{Type: "web_search_preview"},
-		},
-		PreviousResponseID: previousResponseID,
-	}
-
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(buf))
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	client := &http.Client{Timeout: timeout}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(bodyBytes)}
-	}
-
-	var ar apiResponse
-	if err := json.Unmarshal(bodyBytes, &ar); err != nil {
-		return nil, fmt.Errorf("parse json: %w", err)
-	}
-
-	return &ar, nil
-}
-
-// ExtractAnswer extracts the answer text from the API response
-func ExtractAnswer(apiResp *apiResponse) string {
-	var answers []string
-	for _, item := range apiResp.Output {
-		if item.Type != "message" {
-			continue
-		}
-		for _, content := range item.Content {
-			if content.Type == "output_text" && content.Text != "" {
-				answers = append(answers, content.Text)
-			}
-		}
-	}
-
-	// Join all text content into a single answer
-	if len(answers) > 0 {
-		// If multiple text segments, join them with space
-		answer := ""
-		for i, text := range answers {
-			if i > 0 {
-				answer += " "
-			}
-			answer += text
-		}
-		return answer
-	}
-	return ""
-}
-
-// HandleWebSearch handles web search requests for the MCP server
-func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (interface{}, error) {
-	// Get the MCP server from context for logging (if available)
-	mcpServer := server.ServerFromContext(ctx)
-
-	// Extract parameters
-	query, ok := args["query"].(string)
-	if !ok || query == "" {
-		errMsg := "Please provide a query to search for"
-		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-				mcp.LoggingLevelError,
-				"api_handler",
-				errMsg,
-			))
-		}
-		return map[string]interface{}{
-			"success": false,
-			"error":   errMsg,
-		}, nil
-	}
-
-	model, _ := args["model"].(string) //nolint:errcheck // Type assertion ok to ignore
-	if model == "" {
-		model = defaultModel
-	}
-
-	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck // Type assertion ok to ignore
-	effort = validateEffort(effort)
-
-	verbosity, _ := args["verbosity"].(string) //nolint:errcheck // Type assertion ok to ignore
-	verbosity = validateVerbosity(verbosity)
-
-	previousResponseID, _ := args["previous_response_id"].(string) //nolint:errcheck // Type assertion ok to ignore
-
-	// Use effort-based timeout
-	timeout := getTimeoutForEffort(effort)
-
-	// Make API call
-	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, verbosity, previousResponseID, timeout)
-	if err != nil {
-		return nil, err
-	}
-
-	// Extract answer from response
-	answer := ExtractAnswer(apiResp)
-	if answer == "" {
-		errMsg := "No answer found in response"
-		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-				mcp.LoggingLevelWarning,
-				"api_handler",
-				errMsg,
-			))
-		}
-		return map[string]interface{}{
-			"success": false,
-			"error":   errMsg,
-		}, nil
-	}
-
-	// Log successful completion
-	if mcpServer != nil {
-		_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-			mcp.LoggingLevelDebug,
-			"api_handler",
-			fmt.Sprintf("Search completed successfully, answer length: %d characters", len(answer)),
-		))
-	}
-
-	// Return structured response
-	return map[string]interface{}{
-		"success":          true,
-		"answer":           answer,
-		"query":            query,
-		"model":            apiResp.Model,
-		"effort":           apiResp.Reasoning.Effort,
-		"timeout_used":     timeout.String(),
-		"id":               apiResp.ID,
-		"requested_model":  model,
-		"requested_effort": effort,
-	}, nil
-}
 </file>
 
 <file path="transport.go">
@@ -1503,6 +1257,295 @@ func parseMCPConfig(apiKey, baseURL, transport, port string, verbose bool) MCPCo
 }
 </file>
 
+<file path="api.go">
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/mark3labs/mcp-go/mcp"
+)
+
+// CallAPI makes the actual API call - reusable for both CLI and MCP
+func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration, useWebSearch bool) (*apiResponse, error) {
+	body := requestBody{
+		Model: model,
+		Input: query,
+		Reasoning: reqReasoning{
+			Effort: effort,
+		},
+		Text: reqText{
+			Verbosity: verbosity,
+		},
+		PreviousResponseID: previousResponseID,
+	}
+
+	// Conditionally add web search tool
+	if useWebSearch {
+		body.Tools = []reqTool{
+			{Type: "web_search_preview"},
+		}
+	}
+
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(buf))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(bodyBytes)}
+	}
+
+	var ar apiResponse
+	if err := json.Unmarshal(bodyBytes, &ar); err != nil {
+		return nil, fmt.Errorf("parse json: %w", err)
+	}
+
+	return &ar, nil
+}
+
+// ExtractAnswer extracts the answer text from the API response
+func ExtractAnswer(apiResp *apiResponse) string {
+	var answers []string
+	for _, item := range apiResp.Output {
+		if item.Type != "message" {
+			continue
+		}
+		for _, content := range item.Content {
+			if content.Type == "output_text" && content.Text != "" {
+				answers = append(answers, content.Text)
+			}
+		}
+	}
+
+	// Join all text content into a single answer
+	if len(answers) > 0 {
+		// If multiple text segments, join them with space
+		answer := ""
+		for i, text := range answers {
+			if i > 0 {
+				answer += " "
+			}
+			answer += text
+		}
+		return answer
+	}
+	return ""
+}
+
+// ShouldUseWebSearch analyzes a query to determine if web search is likely needed
+// Returns true if the query appears to need current information or web search
+func ShouldUseWebSearch(query string) bool {
+	queryLower := strings.ToLower(strings.TrimSpace(query))
+
+	// Indicators that suggest current/recent information is needed
+	currentIndicators := []string{
+		"latest", "recent", "current", "now", "today", "this year", "2024", "2025",
+		"news", "breaking", "updates", "happening", "trending", "new", "just",
+		"price", "stock", "weather", "forecast", "schedule", "events",
+		"who won", "who is", "what happened", "when did", "status of",
+	}
+
+	// Indicators that suggest web search would be helpful
+	searchIndicators := []string{
+		"find", "search", "look up", "reviews", "comparison", "vs",
+		"best", "top", "list of", "guide", "tutorial", "how to",
+		"where can i", "where to", "contact", "address", "phone",
+		"buy", "purchase", "store", "shop", "available",
+	}
+
+	// Check for current information indicators
+	for _, indicator := range currentIndicators {
+		if strings.Contains(queryLower, indicator) {
+			return true
+		}
+	}
+
+	// Check for search-oriented indicators
+	for _, indicator := range searchIndicators {
+		if strings.Contains(queryLower, indicator) {
+			return true
+		}
+	}
+
+	// Patterns that suggest factual knowledge questions (don't need web search)
+	knowledgePatterns := []string{
+		"what is", "define", "explain", "how does", "why does", "what does",
+		"capital of", "president of", "author of", "invented", "discovered",
+		"formula", "equation", "rule", "law", "theory", "principle",
+		"meaning of", "difference between", "history of", "origin of",
+	}
+
+	// If it looks like a knowledge question, check if it's asking for current info
+	for _, pattern := range knowledgePatterns {
+		if strings.HasPrefix(queryLower, pattern) {
+			// Even knowledge questions might need web search if they're about current things
+			for _, indicator := range currentIndicators {
+				if strings.Contains(queryLower, indicator) {
+					return true
+				}
+			}
+			// Pure knowledge question - probably doesn't need web search
+			return false
+		}
+	}
+
+	// Default: if we're not sure, use web search for better results
+	// This ensures we don't miss cases where web search would be helpful
+	return true
+}
+
+// HandleWebSearch handles web search requests for the MCP server
+func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (*WebSearchResult, error) {
+	// Extract optional previous response id first for consistent population
+	previousResponseID, _ := args["previous_response_id"].(string) //nolint:errcheck
+
+	// Extract parameters
+	query, ok := args["query"].(string)
+	if !ok || query == "" {
+		errMsg := "Please provide a query to search for"
+		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
+		return &WebSearchResult{
+				Success:            false,
+				Error:              errMsg,
+				Query:              query,
+				WebSearchMode:      "auto",
+				WebSearchUsed:      false,
+				PreviousResponseID: previousResponseID,
+			},
+			nil
+	}
+
+	model, _ := args["model"].(string) //nolint:errcheck // Type assertion ok to ignore
+	if model == "" {
+		model = defaultModel
+	}
+
+	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck // Type assertion ok to ignore
+	effort = validateEffort(effort)
+
+	verbosity, _ := args["verbosity"].(string) //nolint:errcheck // Type assertion ok to ignore
+	verbosity = validateVerbosity(verbosity)
+
+	// Extract and validate web search mode parameter
+	webSearchMode, _ := args["web_search"].(string) //nolint:errcheck // Type assertion ok to ignore
+	if webSearchMode == "" {
+		webSearchMode = "auto" // default behavior
+	}
+
+	// Determine whether to use web search
+	var useWebSearch bool
+	switch webSearchMode {
+	case "always":
+		useWebSearch = true
+	case "never":
+		useWebSearch = false
+	case "auto":
+		useWebSearch = ShouldUseWebSearch(query)
+	default:
+		errMsg := fmt.Sprintf("Invalid web_search mode: %s (use 'auto', 'always', or 'never')", webSearchMode)
+		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
+		return &WebSearchResult{
+			Success:            false,
+			Error:              errMsg,
+			Query:              query,
+			WebSearchMode:      webSearchMode,
+			WebSearchUsed:      false,
+			PreviousResponseID: previousResponseID,
+		}, nil
+	}
+
+	// Use effort-based timeout
+	timeout := getTimeoutForEffort(effort)
+
+	// Make API call with determined web search setting
+	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, verbosity, previousResponseID, timeout, useWebSearch)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract answer from response
+	answer := ExtractAnswer(apiResp)
+	if answer == "" {
+		errMsg := "No answer found in response"
+		logToClient(ctx, mcp.LoggingLevelWarning, "api_handler", errMsg)
+		return &WebSearchResult{
+			Success:            false,
+			Error:              errMsg,
+			Query:              query,
+			RequestedModel:     model,
+			RequestedEffort:    effort,
+			WebSearchMode:      webSearchMode,
+			WebSearchUsed:      useWebSearch,
+			TimeoutUsed:        timeout.String(),
+			PreviousResponseID: previousResponseID,
+		}, nil
+	}
+
+	// Log successful completion
+	logToClient(ctx, mcp.LoggingLevelDebug, "api_handler", fmt.Sprintf("Search completed successfully, answer length: %d characters", len(answer)))
+
+	// Return structured response
+	return &WebSearchResult{
+		Success:            true,
+		Answer:             answer,
+		Query:              query,
+		Model:              apiResp.Model,
+		Effort:             apiResp.Reasoning.Effort,
+		TimeoutUsed:        timeout.String(),
+		ID:                 apiResp.ID,
+		RequestedModel:     model,
+		RequestedEffort:    effort,
+		WebSearchMode:      webSearchMode,
+		WebSearchUsed:      useWebSearch,
+		PreviousResponseID: previousResponseID,
+	}, nil
+}
+
+// WebSearchResult defines the structured result returned to MCP clients
+type WebSearchResult struct {
+	Success            bool   `json:"success"`
+	Answer             string `json:"answer,omitempty"`
+	Query              string `json:"query"`
+	Model              string `json:"model"`
+	Effort             string `json:"effort"`
+	TimeoutUsed        string `json:"timeout_used"`
+	ID                 string `json:"id,omitempty"`
+	RequestedModel     string `json:"requested_model"`
+	RequestedEffort    string `json:"requested_effort"`
+	WebSearchMode      string `json:"web_search_mode"`
+	WebSearchUsed      bool   `json:"web_search_used"`
+	PreviousResponseID string `json:"previous_response_id,omitempty"`
+	Error              string `json:"error,omitempty"`
+}
+</file>
+
 <file path="main.go">
 package main
 
@@ -1607,6 +1650,7 @@ func runCLI() {
 			return defaultEffort
 		}(), "effort (env EFFORT)")
 		verbosity   = flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
+		webSearch   = flag.String("web-search", "auto", "web search mode: auto (smart detection), always (force on), never (force off)")
 		questionVal string
 		timeout     = flag.Duration("timeout", func() time.Duration {
 			if envCfg.HasTimeout {
@@ -1646,19 +1690,33 @@ func runCLI() {
 	*effort = validateEffort(*effort)
 	*verbosity = validateVerbosity(*verbosity)
 
-	// If timeout wasn't explicitly set, use effort-based timeout
-	if !envCfg.HasTimeout {
-		flag.Visit(func(f *flag.Flag) {
-			if f.Name == "timeout" {
-				return // User set it explicitly
-			}
-		})
+	// Validate web search mode
+	var useWebSearch bool
+	switch *webSearch {
+	case "always":
+		useWebSearch = true
+	case "never":
+		useWebSearch = false
+	case "auto", "":
+		useWebSearch = ShouldUseWebSearch(q)
+	default:
+		fail(2, fmt.Sprintf("invalid web-search mode: %s (use 'auto', 'always', or 'never')", *webSearch))
+	}
+
+	// Only override timeout if neither env nor CLI provided it
+	var timeoutFlagSet bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "timeout" {
+			timeoutFlagSet = true
+		}
+	})
+	if !envCfg.HasTimeout && !timeoutFlagSet {
 		*timeout = getTimeoutForEffort(*effort)
 	}
 
-	// Make API call
+	// Make API call with determined web search setting
 	ctx := context.Background()
-	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *verbosity, "", *timeout)
+	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *verbosity, "", *timeout, useWebSearch)
 	if err != nil {
 		fail(2, err.Error())
 	}
@@ -1684,12 +1742,23 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+// logToClient centralizes logging to MCP clients and stderr on failure
+func logToClient(ctx context.Context, level mcp.LoggingLevel, source, message string) {
+	mcpServer := server.ServerFromContext(ctx)
+	if mcpServer == nil {
+		return
+	}
+	if err := mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(level, source, message)); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to send log message: %v\n", err)
+	}
+}
 
 // NewMCPServer creates and configures an MCP server with tools, resources, and prompts
 func NewMCPServer(cfg MCPConfig) *server.MCPServer {
@@ -1728,6 +1797,11 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 			mcp.WithString("previous_response_id",
 				mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
 			),
+			mcp.WithString("web_search",
+				mcp.DefaultString("auto"),
+				mcp.Description("Web search mode: auto (smart detection), always (force on), never (force off)"),
+				mcp.Enum("auto", "always", "never"),
+			),
 		),
 		webSearchHandler(cfg.APIKey, cfg.BaseURL),
 	)
@@ -1761,19 +1835,10 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 // webSearchHandler returns a handler for the web search tool
 func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Get the server from context to send log messages
-		mcpServer := server.ServerFromContext(ctx)
-
 		// Extract parameters
 		query, err := request.RequireString("query")
 		if err != nil {
-			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-					mcp.LoggingLevelError,
-					"web_search",
-					fmt.Sprintf("Failed to extract query parameter: %v", err),
-				))
-			}
+			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("Failed to extract query parameter: %v", err))
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
@@ -1781,15 +1846,10 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		effort := request.GetString("reasoning_effort", defaultEffort)
 		verbosity := request.GetString("verbosity", defaultVerbosity)
 		previousResponseID := request.GetString("previous_response_id", "")
+		webSearchMode := request.GetString("web_search", "auto")
 
 		// Log the search request
-		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-				mcp.LoggingLevelInfo,
-				"web_search",
-				fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s'", query, model, effort, verbosity),
-			))
-		}
+		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%s'", query, model, effort, verbosity, webSearchMode))
 
 		// Call handler with properly extracted values
 		args := map[string]interface{}{
@@ -1798,59 +1858,28 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			"reasoning_effort":     effort,
 			"verbosity":            verbosity,
 			"previous_response_id": previousResponseID,
+			"web_search":           webSearchMode,
 		}
 
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
 		if err != nil {
-			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-					mcp.LoggingLevelError,
-					"web_search",
-					fmt.Sprintf("Web search failed: %v", err),
-				))
-			}
+			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("Web search failed: %v", err))
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
 		// Log success
-		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-				mcp.LoggingLevelInfo,
-				"web_search",
-				"Web search completed successfully",
-			))
-		}
+		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", "Web search completed successfully")
 
-		// Convert result to JSON string for text content
-		resultJSON, err := json.Marshal(result)
-		if err != nil {
-			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-					mcp.LoggingLevelError,
-					"web_search",
-					fmt.Sprintf("Failed to marshal result: %v", err),
-				))
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
-		}
-		return mcp.NewToolResultText(string(resultJSON)), nil
+		// Return structured JSON content rather than a JSON string
+		return mcp.NewToolResultStructuredOnly(result), nil
 	}
 }
 
 // serverInfoHandler returns a handler for the server info resource
 func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-		// Get the server from context to send log messages
-		mcpServer := server.ServerFromContext(ctx)
-
 		// Log the resource access
-		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-				mcp.LoggingLevelDebug,
-				"server_info",
-				fmt.Sprintf("Server info resource accessed: URI=%s", request.Params.URI),
-			))
-		}
+		logToClient(ctx, mcp.LoggingLevelDebug, "server_info", fmt.Sprintf("Server info resource accessed: URI=%s", request.Params.URI))
 
 		info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nEndpoint: %s\n", serverVersion, baseURL)
 		return []mcp.ResourceContents{
@@ -1866,29 +1895,14 @@ func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceReq
 // webSearchPromptHandler returns a handler for the intelligent web search prompt
 func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		// Get the server from context to send log messages
-		mcpServer := server.ServerFromContext(ctx)
-
 		userQuestion := request.Params.Arguments["user_question"]
 		if userQuestion == "" {
-			if mcpServer != nil {
-				_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-					mcp.LoggingLevelError,
-					"web_search_prompt",
-					"user_question parameter is required",
-				))
-			}
+			logToClient(ctx, mcp.LoggingLevelError, "web_search_prompt", "user_question parameter is required")
 			return nil, fmt.Errorf("user_question parameter is required")
 		}
 
 		// Log the prompt request
-		if mcpServer != nil {
-			_ = mcpServer.SendLogMessageToClient(ctx, mcp.NewLoggingMessageNotification(
-				mcp.LoggingLevelDebug,
-				"web_search_prompt",
-				fmt.Sprintf("Generating prompt for question: %s", userQuestion),
-			))
-		}
+		logToClient(ctx, mcp.LoggingLevelDebug, "web_search_prompt", fmt.Sprintf("Generating prompt for question: %s", userQuestion))
 
 		// Return properly structured messages with system and user roles
 		messages := []mcp.PromptMessage{

@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
-func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration) (*apiResponse, error) {
+func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration, useWebSearch bool) (*apiResponse, error) {
 	body := requestBody{
 		Model: model,
 		Input: query,
@@ -23,10 +24,14 @@ func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosi
 		Text: reqText{
 			Verbosity: verbosity,
 		},
-		Tools: []reqTool{
-			{Type: "web_search_preview"},
-		},
 		PreviousResponseID: previousResponseID,
+	}
+
+	// Conditionally add web search tool
+	if useWebSearch {
+		body.Tools = []reqTool{
+			{Type: "web_search_preview"},
+		}
 	}
 
 	buf, err := json.Marshal(body)
@@ -94,6 +99,68 @@ func ExtractAnswer(apiResp *apiResponse) string {
 	return ""
 }
 
+// ShouldUseWebSearch analyzes a query to determine if web search is likely needed
+// Returns true if the query appears to need current information or web search
+func ShouldUseWebSearch(query string) bool {
+	queryLower := strings.ToLower(strings.TrimSpace(query))
+
+	// Indicators that suggest current/recent information is needed
+	currentIndicators := []string{
+		"latest", "recent", "current", "now", "today", "this year", "2024", "2025",
+		"news", "breaking", "updates", "happening", "trending", "new", "just",
+		"price", "stock", "weather", "forecast", "schedule", "events",
+		"who won", "who is", "what happened", "when did", "status of",
+	}
+
+	// Indicators that suggest web search would be helpful
+	searchIndicators := []string{
+		"find", "search", "look up", "reviews", "comparison", "vs",
+		"best", "top", "list of", "guide", "tutorial", "how to",
+		"where can i", "where to", "contact", "address", "phone",
+		"buy", "purchase", "store", "shop", "available",
+	}
+
+	// Check for current information indicators
+	for _, indicator := range currentIndicators {
+		if strings.Contains(queryLower, indicator) {
+			return true
+		}
+	}
+
+	// Check for search-oriented indicators
+	for _, indicator := range searchIndicators {
+		if strings.Contains(queryLower, indicator) {
+			return true
+		}
+	}
+
+	// Patterns that suggest factual knowledge questions (don't need web search)
+	knowledgePatterns := []string{
+		"what is", "define", "explain", "how does", "why does", "what does",
+		"capital of", "president of", "author of", "invented", "discovered",
+		"formula", "equation", "rule", "law", "theory", "principle",
+		"meaning of", "difference between", "history of", "origin of",
+	}
+
+	// If it looks like a knowledge question, check if it's asking for current info
+	for _, pattern := range knowledgePatterns {
+		if strings.HasPrefix(queryLower, pattern) {
+			// Even knowledge questions might need web search if they're about current things
+			for _, indicator := range currentIndicators {
+				if strings.Contains(queryLower, indicator) {
+					return true
+				}
+			}
+			// Pure knowledge question - probably doesn't need web search
+			return false
+		}
+	}
+
+	// Default: if we're not sure, use web search for better results
+	// This ensures we don't miss cases where web search would be helpful
+	return true
+}
+
 // HandleWebSearch handles web search requests for the MCP server
 func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (*WebSearchResult, error) {
 	// Extract optional previous response id first for consistent population
@@ -108,6 +175,8 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 				Success:            false,
 				Error:              errMsg,
 				Query:              query,
+				WebSearchMode:      "auto",
+				WebSearchUsed:      false,
 				PreviousResponseID: previousResponseID,
 			},
 			nil
@@ -124,11 +193,39 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	verbosity, _ := args["verbosity"].(string) //nolint:errcheck // Type assertion ok to ignore
 	verbosity = validateVerbosity(verbosity)
 
+	// Extract and validate web search mode parameter
+	webSearchMode, _ := args["web_search"].(string) //nolint:errcheck // Type assertion ok to ignore
+	if webSearchMode == "" {
+		webSearchMode = "auto" // default behavior
+	}
+
+	// Determine whether to use web search
+	var useWebSearch bool
+	switch webSearchMode {
+	case "always":
+		useWebSearch = true
+	case "never":
+		useWebSearch = false
+	case "auto":
+		useWebSearch = ShouldUseWebSearch(query)
+	default:
+		errMsg := fmt.Sprintf("Invalid web_search mode: %s (use 'auto', 'always', or 'never')", webSearchMode)
+		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
+		return &WebSearchResult{
+			Success:            false,
+			Error:              errMsg,
+			Query:              query,
+			WebSearchMode:      webSearchMode,
+			WebSearchUsed:      false,
+			PreviousResponseID: previousResponseID,
+		}, nil
+	}
+
 	// Use effort-based timeout
 	timeout := getTimeoutForEffort(effort)
 
-	// Make API call
-	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, verbosity, previousResponseID, timeout)
+	// Make API call with determined web search setting
+	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, verbosity, previousResponseID, timeout, useWebSearch)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +241,8 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 			Query:              query,
 			RequestedModel:     model,
 			RequestedEffort:    effort,
+			WebSearchMode:      webSearchMode,
+			WebSearchUsed:      useWebSearch,
 			TimeoutUsed:        timeout.String(),
 			PreviousResponseID: previousResponseID,
 		}, nil
@@ -163,6 +262,8 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 		ID:                 apiResp.ID,
 		RequestedModel:     model,
 		RequestedEffort:    effort,
+		WebSearchMode:      webSearchMode,
+		WebSearchUsed:      useWebSearch,
 		PreviousResponseID: previousResponseID,
 	}, nil
 }
@@ -178,6 +279,8 @@ type WebSearchResult struct {
 	ID                 string `json:"id,omitempty"`
 	RequestedModel     string `json:"requested_model"`
 	RequestedEffort    string `json:"requested_effort"`
+	WebSearchMode      string `json:"web_search_mode"`
+	WebSearchUsed      bool   `json:"web_search_used"`
 	PreviousResponseID string `json:"previous_response_id,omitempty"`
 	Error              string `json:"error,omitempty"`
 }

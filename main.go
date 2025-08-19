@@ -101,6 +101,7 @@ func runCLI() {
 			return defaultEffort
 		}(), "effort (env EFFORT)")
 		verbosity   = flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
+		webSearch   = flag.String("web-search", "auto", "web search mode: auto (smart detection), always (force on), never (force off)")
 		questionVal string
 		timeout     = flag.Duration("timeout", func() time.Duration {
 			if envCfg.HasTimeout {
@@ -140,6 +141,19 @@ func runCLI() {
 	*effort = validateEffort(*effort)
 	*verbosity = validateVerbosity(*verbosity)
 
+	// Validate web search mode
+	var useWebSearch bool
+	switch *webSearch {
+	case "always":
+		useWebSearch = true
+	case "never":
+		useWebSearch = false
+	case "auto", "":
+		useWebSearch = ShouldUseWebSearch(q)
+	default:
+		fail(2, fmt.Sprintf("invalid web-search mode: %s (use 'auto', 'always', or 'never')", *webSearch))
+	}
+
 	// Only override timeout if neither env nor CLI provided it
 	var timeoutFlagSet bool
 	flag.Visit(func(f *flag.Flag) {
@@ -151,9 +165,9 @@ func runCLI() {
 		*timeout = getTimeoutForEffort(*effort)
 	}
 
-	// Make API call
+	// Make API call with determined web search setting
 	ctx := context.Background()
-	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *verbosity, "", *timeout)
+	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *verbosity, "", *timeout, useWebSearch)
 	if err != nil {
 		fail(2, err.Error())
 	}
