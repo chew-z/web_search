@@ -117,7 +117,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-#### HTTP/SSE Transport (for Web Integration)
+#### HTTP Transport (for Web Integration)
 
 ```bash
 # Start HTTP server on default port 8080
@@ -133,8 +133,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 **Endpoints:**
 - `GET /` - API documentation
 - `GET /health` - Health check
-- `GET /sse` - Server-Sent Events for MCP protocol
-- `GET /message` - Message handling endpoint
+
+- `POST /message` - Message handling endpoint
+
+**Note:** `POST /message` is for sending requests to the MCP server (JSON-RPC 2.0 payload).
 
 ## MCP Server Features
 
@@ -147,6 +149,7 @@ Performs intelligent web searches with cost-effective model selection and conver
 | `model` | string | No | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano |
 | `reasoning_effort` | string | No | `medium` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
 | `previous_response_id` | string | No | - | Previous response ID for conversation continuity |
+| `web_search` | boolean | No | `true` | Use web search (default: true) |
 
 ### Prompt: `web_search`
 Enhanced prompt template that guides Claude Desktop to:
@@ -224,6 +227,7 @@ Options:
   -timeout        Request timeout (overrides effort-based defaults)
   -show-all       Show raw JSON response
   -base           API endpoint URL
+  -web-search     Use web search (default: true)
 ```
 
 ### MCP Server Mode
@@ -233,6 +237,7 @@ answer mcp [options]
 Options:
   -t, --transport  Transport type: stdio or http (default: stdio)
   -port           HTTP server port (default: 8080)
+  -host           HTTP server host (default: 127.0.0.1)
   -base           API endpoint URL
   -verbose        Enable verbose logging
 ```
@@ -253,61 +258,6 @@ Options:
 
 # Debug mode with raw output
 ./bin/answer -q "Test query" -show-all
-```
-
-### MCP Integration Examples
-
-**JavaScript SSE Client:**
-
-```javascript
-const eventSource = new EventSource('http://localhost:8080/sse');
-
-eventSource.onmessage = (event) => {
-  console.log('Received:', JSON.parse(event.data));
-};
-
-// Send request via fetch to message endpoint
-fetch('http://localhost:8080/message', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    jsonrpc: '2.0',
-    method: 'tools/call',
-    params: {
-      name: 'gpt_websearch',
-      arguments: {
-        query: 'Latest AI news',
-        model: 'gpt-5-mini',
-        reasoning_effort: 'medium',  // 5-minute timeout
-        previous_response_id: 'resp_123...'  // Optional: for follow-up questions
-      }
-    },
-    id: 1
-  })
-});
-```
-
-## Docker Support
-
-```dockerfile
-FROM golang:1.25-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go mod download
-RUN go build -o answer .
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-COPY --from=builder /app/answer /usr/local/bin/answer
-ENV OPENAI_API_KEY=""
-EXPOSE 8080
-CMD ["answer", "mcp", "-t", "http"]
-```
-
-Build and run:
-```bash
-docker build -t answer .
-docker run -p 8080:8080 -e OPENAI_API_KEY=your-key answer
 ```
 
 ## Development
@@ -342,46 +292,3 @@ go test ./...
 ```bash
 go fmt ./...
 ```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"OPENAI_API_KEY is not set"**
-   - Set the environment variable or create a `.env` file
-
-2. **"API error: status=401"**
-   - Verify your API key is valid and has web search preview access
-
-3. **"no output_text found in response"**
-   - The model might not support web search
-   - Try using a different model
-
-4. **MCP client connection issues**
-   - For stdio: Check that the binary path is correct
-   - For HTTP: Verify the port is not in use
-
-### Debug Mode
-
-```bash
-# CLI debug
-./bin/answer -q "test" -show-all
-
-# MCP debug
-./bin/answer mcp -t stdio -verbose
-./bin/answer mcp -t http -verbose
-```
-
-## License
-
-See LICENSE file for details.
-
-## Contributing
-
-Please see [AGENTS.md](AGENTS.md) for development guidelines and contribution rules.
-
-## Links
-
-- [MCP Protocol Specification](https://modelcontextprotocol.io/)
-- [OpenAI API Documentation](https://platform.openai.com/docs)
-- [Detailed MCP Server Documentation](MCP_SERVER.md)

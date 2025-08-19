@@ -10,14 +10,6 @@ var (
 	// Configuration errors
 	ErrNoAPIKey = errors.New("OPENAI_API_KEY environment variable is required")
 
-	// API errors
-	ErrNoOutputText = errors.New("no output_text found in response")
-	ErrAPIRequest   = errors.New("API request failed")
-
-	// MCP errors
-	ErrQueryRequired = errors.New("please provide a query to search for")
-)
-
 // APIError represents an error from the OpenAI API
 type APIError struct {
 	StatusCode int
