@@ -14,12 +14,12 @@ func RunStdioTransport(mcpServer *server.MCPServer) error {
 }
 
 // RunHTTPTransport runs the MCP server using HTTP/SSE transport
-func RunHTTPTransport(mcpServer *server.MCPServer, port string) error {
+func RunHTTPTransport(mcpServer *server.MCPServer, host, port string) error {
 	httpServer := server.NewStreamableHTTPServer(mcpServer)
 
-	addr := fmt.Sprintf(":%s", port)
+	addr := fmt.Sprintf("%s:%s", host, port)
 	log.Printf("Starting HTTP/SSE server on %s", addr)
-	log.Printf("MCP endpoint: http://localhost:%s/", port)
+	log.Printf("MCP endpoint: http://%s:%s/", host, port)
 
 	return httpServer.Start(addr)
 }

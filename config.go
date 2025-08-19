@@ -85,6 +85,7 @@ type MCPConfig struct {
 	BaseURL   string
 	Transport string
 	Port      string
+	Host      string
 	Verbose   bool
 }
 
@@ -159,7 +160,7 @@ func validateVerbosity(verbosity string) string {
 }
 
 // parseMCPConfig creates MCPConfig from environment and command line flags
-func parseMCPConfig(apiKey, baseURL, transport, port string, verbose bool) MCPConfig {
+func parseMCPConfig(apiKey, baseURL, transport, port, host string, verbose bool) MCPConfig {
 	// Use defaults if not provided
 	if baseURL == "" {
 		baseURL = defaultBaseURL
@@ -170,12 +171,16 @@ func parseMCPConfig(apiKey, baseURL, transport, port string, verbose bool) MCPCo
 	if port == "" {
 		port = "8080"
 	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
 
 	return MCPConfig{
 		APIKey:    apiKey,
 		BaseURL:   baseURL,
 		Transport: transport,
 		Port:      port,
+		Host:      host,
 		Verbose:   verbose,
 	}
 }

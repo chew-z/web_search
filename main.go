@@ -29,6 +29,7 @@ func runMCPMode() {
 	var (
 		transport = mcpFlags.String("t", "stdio", "Transport type (stdio or http)")
 		port      = mcpFlags.String("port", "8080", "HTTP server port")
+		host      = mcpFlags.String("host", "127.0.0.1", "HTTP server host (default: 127.0.0.1)")
 		baseURL   = mcpFlags.String("base", defaultBaseURL, "API base URL")
 		verbose   = mcpFlags.Bool("verbose", false, "Enable verbose logging")
 	)
@@ -55,7 +56,7 @@ func runMCPMode() {
 	}
 
 	// Create server configuration using the config helper
-	cfg := parseMCPConfig(envCfg.APIKey, *baseURL, *transport, *port, *verbose)
+	cfg := parseMCPConfig(envCfg.APIKey, *baseURL, *transport, *port, *host, *verbose)
 
 	// Create and run MCP server
 	mcpServer := NewMCPServer(cfg)
@@ -68,7 +69,7 @@ func runMCPMode() {
 			os.Exit(1)
 		}
 	case "http":
-		if err := RunHTTPTransport(mcpServer, cfg.Port); err != nil {
+		if err := RunHTTPTransport(mcpServer, cfg.Host, cfg.Port); err != nil {
 			fmt.Fprintf(os.Stderr, "HTTP transport error: %v\n", err)
 			os.Exit(1)
 		}

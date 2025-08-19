@@ -15,10 +15,7 @@ var (
 	ErrAPIRequest   = errors.New("API request failed")
 
 	// MCP errors
-	ErrQueryRequired      = errors.New("please provide a query to search for")
-	ErrInvalidEffort      = errors.New("invalid reasoning effort level")
-	ErrSessionNotFound    = errors.New("session not found")
-	ErrNotificationFailed = errors.New("failed to send notification")
+	ErrQueryRequired = errors.New("please provide a query to search for")
 )
 
 // APIError represents an error from the OpenAI API
