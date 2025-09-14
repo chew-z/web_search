@@ -6,11 +6,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+const maxResponseBodySize = 10 * 1024 * 1024 // 10 MB
+
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
+	},
+}
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
 func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration, useWebSearch bool) (*apiResponse, error) {
@@ -41,6 +60,9 @@ func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosi
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(buf))
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -48,14 +70,14 @@ func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosi
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: timeout}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	limitedReader := io.LimitReader(resp.Body, maxResponseBodySize)
+	bodyBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -77,31 +99,21 @@ func ExtractAnswer(apiResp *apiResponse) string {
 	if apiResp == nil {
 		return ""
 	}
-	var answers []string
+	var sb strings.Builder
 	for _, item := range apiResp.Output {
 		if item.Type != "message" {
 			continue
 		}
 		for _, content := range item.Content {
 			if content.Type == "output_text" && content.Text != "" {
-				answers = append(answers, content.Text)
+				if sb.Len() > 0 {
+					sb.WriteString(" ")
+				}
+				sb.WriteString(content.Text)
 			}
 		}
 	}
-
-	// Join all text content into a single answer
-	if len(answers) > 0 {
-		// If multiple text segments, join them with space
-		answer := ""
-		for i, text := range answers {
-			if i > 0 {
-				answer += " "
-			}
-			answer += text
-		}
-		return answer
-	}
-	return ""
+	return sb.String()
 }
 
 // HandleWebSearch handles web search requests for the MCP server

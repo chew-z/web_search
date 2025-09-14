@@ -42,7 +42,7 @@ type requestBody struct {
 	Input              string       `json:"input"`
 	Reasoning          reqReasoning `json:"reasoning"`
 	Text               reqText      `json:"text"`
-	Tools              []reqTool    `json:"tools"`
+	Tools              []reqTool    `json:"tools,omitempty"`
 	PreviousResponseID string       `json:"previous_response_id,omitempty"`
 }
 
