@@ -1,16 +1,36 @@
 .DS_Store
-bin/**
-.env
+
 go.sum
-*.log
+bin/**
+
+.env
+
+*_test.go
+test_*
+
+AGENTS.md
+GOLANG.md
+GODOC.md
+CODANNA.md
+
+reports/**
+.repomix/
+repomix.config.json
+repomix-output.xml
 
 .aider*
 .claude/**
 .codex/**
 .gemini/**
 .vscode/**
-.repomix/**
 
-repomix.config.json
+.mcp.json
 
-test_*
+.codanna/**
+.codannaignore
+.fastembed_cache/**
+
+run_*.sh
+run_format.sh
+run_lint.sh
+run_tests.sh
