@@ -37,9 +37,12 @@ func runMCPMode() {
 	// Also support long form for transport
 	transportLong := mcpFlags.String("transport", "", "Transport type (overrides -t)")
 
+	// Initialize logger early with default level (info). Adjust after parsing.
+	initLogger(false)
+
 	// Parse MCP-specific flags (skip "answer mcp" args)
 	if err := mcpFlags.Parse(os.Args[2:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		Error("Error parsing flags", "error", err)
 		os.Exit(1)
 	}
 
@@ -48,10 +51,13 @@ func runMCPMode() {
 		*transport = *transportLong
 	}
 
+	// Honor -verbose for logger level
+	setVerbose(*verbose)
+
 	// Load environment config
 	envCfg, err := loadEnvConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		Error("Failed to load config", "error", err)
 		os.Exit(1)
 	}
 
@@ -65,16 +71,16 @@ func runMCPMode() {
 	switch cfg.Transport {
 	case "stdio":
 		if err := RunStdioTransport(mcpServer); err != nil {
-			fmt.Fprintf(os.Stderr, "STDIO transport error: %v\n", err)
+			Error("STDIO transport error", "error", err)
 			os.Exit(1)
 		}
 	case "http":
 		if err := RunHTTPTransport(mcpServer, cfg.Host, cfg.Port); err != nil {
-			fmt.Fprintf(os.Stderr, "HTTP transport error: %v\n", err)
+			Error("HTTP transport error", "error", err)
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown transport: %s (use 'stdio' or 'http')\n", cfg.Transport)
+		Error("Unknown transport (use 'stdio' or 'http')", "transport", cfg.Transport)
 		os.Exit(1)
 	}
 }
