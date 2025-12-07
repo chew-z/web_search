@@ -4,20 +4,20 @@ A Go application that provides intelligent web search capabilities using OpenAI'
 
 ## Features
 
-- 🔍 **Intelligent Web Search**: Uses OpenAI's GPT models (gpt-5, gpt-5-mini, gpt-5-nano) with web search capabilities
-- 🎯 **Cost-Effective**: Automatic model selection based on query complexity for optimal cost/performance
-- 🚀 **Dual Mode**: CLI tool and MCP server with stdio/HTTP transports
-- ⚙️ **Smart Configuration**: Effort-based timeouts (3/5/10 minutes) and environment-driven setup
-- 🧠 **Enhanced MCP Prompts**: Intelligent prompt templates guide optimal tool usage
-- 🔄 **Conversation Continuity**: Response IDs enable follow-up questions with maintained context
-- 🔐 **Secure**: Environment-based API key management
+-   🔍 **Intelligent Web Search**: Uses OpenAI's GPT models (gpt-5, gpt-5-mini, gpt-5-nano) with web search capabilities
+-   🎯 **Cost-Effective**: Automatic model selection based on query complexity for optimal cost/performance
+-   🚀 **Dual Mode**: CLI tool and MCP server with stdio/HTTP transports
+-   ⚙️ **Smart Configuration**: Effort-based timeouts (3/5/10 minutes) and environment-driven setup
+-   🧠 **Enhanced MCP Prompts**: Intelligent prompt templates guide optimal tool usage
+-   🔄 **Conversation Continuity**: Response IDs enable follow-up questions with maintained context
+-   🔐 **Secure**: Environment-based API key management
 
 ## Installation
 
 ### Prerequisites
 
-- Go 1.24.0 or later
-- OpenAI API key with web search preview access
+-   Go 1.25.0 or later
+-   OpenAI API key with web search preview access
 
 ### Build from Source
 
@@ -51,9 +51,10 @@ QUESTION=                # Optional: default question
 ```
 
 **Model Selection Guidelines**:
-- `gpt-5-nano`: Simple facts, definitions, quick lookups
-- `gpt-5-mini`: Research tasks, comparisons, specific topics  
-- `gpt-5`: Complex analysis, coding questions, reasoning tasks
+
+-   `gpt-5-nano`: Simple facts, definitions, quick lookups
+-   `gpt-5-mini`: Research tasks, comparisons, specific topics
+-   `gpt-5`: Complex analysis, coding questions, reasoning tasks
 
 **Effort-Based Timeouts**: `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes.
 Tip: Use `low` for quicker answers when speed matters.
@@ -105,15 +106,15 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
-  "mcpServers": {
-    "gpt-websearch": {
-      "command": "/path/to/Answer/bin/answer",
-      "args": ["mcp", "-t", "stdio"],
-      "env": {
-        "OPENAI_API_KEY": "your-api-key"
-      }
+    "mcpServers": {
+        "gpt-websearch": {
+            "command": "/path/to/Answer/bin/answer",
+            "args": ["mcp", "-t", "stdio"],
+            "env": {
+                "OPENAI_API_KEY": "your-api-key"
+            }
+        }
     }
-  }
 }
 ```
 
@@ -131,47 +132,51 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```
 
 **Endpoints:**
-- `GET /` - API documentation
-- `GET /health` - Health check
 
-- `POST /message` - Message handling endpoint
+-   `GET /` - API documentation
+-   `GET /health` - Health check
+
+-   `POST /message` - Message handling endpoint
 
 **Note:** `POST /message` is for sending requests to the MCP server (JSON-RPC 2.0 payload).
 
 ## MCP Server Features
 
 ### Tool: `gpt_websearch`
+
 Performs intelligent web searches with cost-effective model selection and conversation continuity:
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `query` | string | Yes | - | The search query or question |
-| `model` | string | No | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano |
-| `reasoning_effort` | string | No | `medium` | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
-| `previous_response_id` | string | No | - | Previous response ID for conversation continuity |
-| `web_search` | boolean | No | `true` | Use web search (default: true) |
+| Parameter              | Type    | Required | Default      | Description                                                                       |
+| ---------------------- | ------- | -------- | ------------ | --------------------------------------------------------------------------------- |
+| `query`                | string  | Yes      | -            | The search query or question                                                      |
+| `model`                | string  | No       | `gpt-5-mini` | GPT model: gpt-5-mini, gpt-5, or gpt-5-nano                                       |
+| `reasoning_effort`     | string  | No       | `medium`     | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
+| `previous_response_id` | string  | No       | -            | Previous response ID for conversation continuity                                  |
+| `web_search`           | boolean | No       | `true`       | Use web search (default: true)                                                    |
 
 ### Prompt: `web_search`
+
 Enhanced prompt template that guides Claude Desktop to:
-- Analyze user questions in conversation context
-- Select cost-effective models based on complexity
-- Choose appropriate reasoning effort levels
-- Use single, sequential, or parallel search strategies
-- Remember and use response IDs for conversation continuity
+
+-   Analyze user questions in conversation context
+-   Select cost-effective models based on complexity
+-   Choose appropriate reasoning effort levels
+-   Use single, sequential, or parallel search strategies
+-   Remember and use response IDs for conversation continuity
 
 ### Example Response
 
 ```json
 {
-  "success": true,
-  "answer": "The complete answer to your query...",
-  "query": "original query",
-  "model": "gpt-5-mini-2025-08-07",
-  "effort": "low",
-  "timeout_used": "3m0s",
-  "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
-  "requested_model": "gpt-5-mini",
-  "requested_effort": "low"
+    "success": true,
+    "answer": "The complete answer to your query...",
+    "query": "original query",
+    "model": "gpt-5-mini-2025-08-07",
+    "effort": "low",
+    "timeout_used": "3m0s",
+    "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
+    "requested_model": "gpt-5-mini",
+    "requested_effort": "low"
 }
 ```
 
@@ -180,35 +185,38 @@ Enhanced prompt template that guides Claude Desktop to:
 The MCP server supports conversation continuity through response IDs. Each search response includes an `id` field that can be used in follow-up queries to maintain context:
 
 **Initial Query:**
+
 ```json
 {
-  "name": "gpt_websearch",
-  "arguments": {
-    "query": "Tell me about Luxembourg City",
-    "model": "gpt-5-mini",
-    "reasoning_effort": "medium"
-  }
+    "name": "gpt_websearch",
+    "arguments": {
+        "query": "Tell me about Luxembourg City",
+        "model": "gpt-5-mini",
+        "reasoning_effort": "medium"
+    }
 }
 ```
 
 **Response includes ID:**
+
 ```json
 {
-  "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
-  "answer": "Luxembourg City is the capital...",
-  // ... other fields
+    "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
+    "answer": "Luxembourg City is the capital..."
+    // ... other fields
 }
 ```
 
 **Follow-up Query with Context:**
+
 ```json
 {
-  "name": "gpt_websearch",
-  "arguments": {
-    "query": "What are the main tourist attractions there?",
-    "previous_response_id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
-    "reasoning_effort": "low"
-  }
+    "name": "gpt_websearch",
+    "arguments": {
+        "query": "What are the main tourist attractions there?",
+        "previous_response_id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
+        "reasoning_effort": "low"
+    }
 }
 ```
 
@@ -217,6 +225,7 @@ The AI assistant will automatically remember context from the previous search an
 ## Command-Line Reference
 
 ### CLI Mode
+
 ```
 answer [options] [question]
 
@@ -231,6 +240,7 @@ Options:
 ```
 
 ### MCP Server Mode
+
 ```
 answer mcp [options]
 
@@ -263,6 +273,7 @@ Options:
 ## Development
 
 ### Project Structure
+
 ```
 Answer/
 ├── main.go              # Main entry point with CLI and MCP modes
@@ -279,16 +290,19 @@ Answer/
 ```
 
 ### Building
+
 ```bash
 go build -o bin/answer .
 ```
 
 ### Testing
+
 ```bash
 go test ./...
 ```
 
 ### Formatting
+
 ```bash
 go fmt ./...
 ```

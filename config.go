@@ -15,7 +15,7 @@ const (
 
 	// Server metadata
 	serverName    = "gpt-websearch-mcp"
-	serverVersion = "1.0.0"
+	serverVersion = "0.3.1"
 
 	// Timeouts based on reasoning effort
 	timeoutMinimal = 90 * time.Second
