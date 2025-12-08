@@ -1,46 +1,38 @@
 # Release Notes
 
-## v0.3.1 - August 19, 2025
+## v0.3.5 - December 08, 2025
 
 ### 🎉 New Features
 
--   **Enhanced Web Search Capabilities:**
-    -   Added intelligent web search control for more precise results.
-    -   Implemented conversation continuity for web searches, allowing for more natural and continuous interactions.
-    -   Structured web search results for better readability and integration.
--   **Improved API Client and Conversation Continuity:**
-    -   Introduced comprehensive tests for the API client and response handling, significantly improving stability and reliability.
-    -   Added conversation continuity via previous response ID, enabling seamless follow-up interactions.
--   **Structured Logging:**
-    -   Integrated `slog` for structured JSON logging with dynamic log level control.
-    -   Centralized logging to MCP clients with thread-safe initialization.
--   **Verbosity Control:**
-    -   Added verbosity parameter (low/medium/high) for controlling response detail level.
-    -   Default verbosity set to medium for balanced responses.
--   **Reasoning Effort Levels:**
-    -   Support for four effort levels: minimal (90s), low (3min), medium (5min), high (10min).
-    -   Effort-based timeouts for optimal performance.
--   **Enhanced Prompt System:**
-    -   Comprehensive prompt template with parameter optimization recommendations.
-    -   Conversation continuity best practices and multi-search strategies.
--   **Configurable HTTP Transport:**
-    -   Now allows configuring HTTP host and port for greater flexibility in deployment.
-    -   Updated HTTP transport to use POST for messages.
+- **Enhanced API Client and Response Handling:**
+    -   Introduced a more robust HTTP client with configurable timeouts and connection pooling to enhance API call reliability.
+    -   Limited response body size to prevent excessive memory usage and processing large, potentially malformed responses.
+    -   Refined logic for extracting text from API responses to correctly concatenate multiple text segments into a single, coherent answer.
+- **Structured Logging with Dynamic Level Control:**
+    -   Introduced structured logging using the `slog` package to provide better visibility into the application's behavior.
+    -   Centralized logging logic, allowing for dynamic control of log levels, specifically enabling debug logging when the verbose flag is set.
+    -   Enhanced observability by providing consistent, machine-readable log output.
+- **Conversation Continuity and API Improvements:**
+    -   Added comprehensive tests for the API client and response handling, significantly improving stability and reliability.
+    -   Implemented conversation continuity via previous response ID, enabling seamless follow-up interactions.
+- **Model Name Updates:**
+    -   Updated model name references from GPT-5 to GPT-5.1 across documentation and prompt configuration files to reflect expected future model designations, ensuring consistency for complex reasoning tasks.
 
 ### 🔧 Improvements
 
--   **CLI and Prompt Enhancements:**
-    -   Default effort for CLI commands is now set to medium, with improved timeout logic for a smoother user experience.
-    -   Refined web search prompts for clarity and efficiency.
--   **MCP Performance:**
-    -   Improved conversation continuity and overall performance within the MCP server.
+- **Dependency and Language Updates:**
+    -   Updated the minimum required Go version to 1.25.5 to ensure compatibility with newer language features and address known issues.
+    -   Bumped the `mcp-go` dependency to v0.43.2 to incorporate recent improvements and fixes from the library.
+- **Repository Maintenance:**
+    -   Updated `.gitignore` file to include repomix-output.xml and other generated files, preventing accidental commits and keeping the repository clean.
+- **Configuration and Versioning:**
+    -   Updated server version metadata and prepared for new configuration options related to logging verbosity and effort levels.
 
 ### 📚 Documentation
 
--   Updated project documentation and ignore files for better clarity and maintainability.
--   Added release notes for v0.1.0.
+-   Updated project release notes and documentation.
 
 ### ⚙️ Internal Changes
 
--   Refactored MCP server to leverage new `mcp-go` library features, simplifying transport and enhancing API usage.
--   Simplified web search prompt construction and moved web search prompts to a dedicated file for better organization.
+-   Refactored model name constants and references throughout the codebase for consistency.
+-   Enhanced configuration loading and validation logic.

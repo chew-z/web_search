@@ -1,24 +1,20 @@
 # Release Notes
 
-## v0.3.1 - 2025-08-18
+## v0.3.5 - 2025-12-08
 
 ### 🎉 New Features
 
--   **Conversation Continuity**: Implemented conversation continuity for web searches, allowing for more context-aware interactions.
--   **Web Search Tool**: Added a web search tool and server functionality to the API.
--   **Structured Logging**: Integrated `slog` for structured JSON logging with dynamic log level control and thread-safe initialization.
--   **Verbosity Control**: Added verbosity parameter (low/medium/high) for controlling response detail level.
--   **Reasoning Effort Levels**: Support for four effort levels (minimal/low/medium/high) with effort-based timeouts (90s/3min/5min/10min).
--   **Enhanced Prompt System**: Comprehensive prompt template with parameter optimization recommendations and conversation continuity best practices.
--   **Configuration**: The application now loads configuration from environment variables, providing more flexibility.
--   **CLI**: Added a Go CLI for interacting with the API.
--   **Default Model**: Set `gpt-5-mini` as the default model for all interactions.
+- **Enhanced API Client**: Improved HTTP client with configurable timeouts and connection pooling for better reliability. Added response body size limiting and refined text extraction from API responses.
+- **Structured Logging**: Introduced `slog`-based structured JSON logging with dynamic log level control, centralizing logging to MCP clients with thread-safe initialization.
+- **Conversation Continuity**: Enhanced API client with conversation continuity via previous response ID, enabling seamless follow-up interactions.
+- **Model Updates**: Updated model name references from GPT-5 to GPT-5.1 to reflect expected future model designations.
 
 ### 🔧 Improvements
 
--   **Prompt Engineering**: Refined and enhanced web search prompts for clarity, efficiency, and cost-effectiveness.
--   **Code Refactoring**: Simplified web search prompt construction and refactored the MCP server to use new library features, improving code quality and maintainability.
+- **Dependency Updates**: Updated minimum Go version to 1.25.5 and bumped `mcp-go` dependency to v0.43.2 for compatibility and latest features.
+- **Gitignore Enhancements**: Added repomix and other generated files to `.gitignore` to keep repository clean.
+- **Configuration**: Updated server version metadata and prepared for new configuration options related to logging verbosity and effort levels.
 
 ### 📚 Documentation
 
--   Added and updated release notes.
+- Updated release notes and project documentation.
