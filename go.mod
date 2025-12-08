@@ -1,10 +1,10 @@
 module Answer
 
-go 1.25.0
+go 1.25.5
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/mark3labs/mcp-go v0.39.1
+	github.com/mark3labs/mcp-go v0.43.2
 )
 
 require (
