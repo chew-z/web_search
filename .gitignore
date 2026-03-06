@@ -6,33 +6,43 @@ bin/**
 .env
 
 *_test.go
-test_*
-
-pl.rrj.answer.plist
 
 AGENTS.md
 GOLANG.md
 GODOC.md
-CODANNA.md
 
-reports/**
-.repomix/
-repomix.config.json
-repomix-output.xml
+CONTAINER.md
+container-run.toml
 
-.aider*
-.claude/**
-.codex/**
-.gemini/**
-.vscode/**
+# Ephemeral hook-generated files (should not be tracked)
+.claude/session_summary.md
+.claude/compact_backups/
+.claude/deploy_backups/
+
+# Ephemral research reports and retired docs
+docs/reports/
+docs/retired/
+
+.claude/
+.codex/
+.github/
+.vscode/
 
 .mcp.json
 
-.codanna/**
+.codanna/
 .codannaignore
-.fastembed_cache/**
+# local folder
+.fastembed_cache/
+# link to global
+.fastembed_cache
 
-run_*.sh
+# Ephemeral hook-generated files (should not be tracked)
+.claude/session_summary.md
+.claude/compact_backups/
+.claude/deploy_backups/
+
 run_format.sh
 run_lint.sh
-run_tests.sh
+run_test.sh
+run_release.sh
