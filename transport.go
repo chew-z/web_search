@@ -23,8 +23,11 @@ func RunStdioTransport(mcpServer *server.MCPServer) error {
 
 // RunHTTPTransport runs the MCP server using Streamable HTTP transport.
 //
-// It always mounts the MCP handler at /mcp via its own http.ServeMux so
-// behaviour is identical whether auth is enabled or not.
+// The MCP handler is mounted at "/" (catch-all) so the server works behind
+// reverse proxies that forward the original request URI (e.g. nginx with
+// variable proxy_pass sends /answer/mcp, not /mcp). The mcp-go
+// StreamableHTTPServer routes by HTTP method, not path, so a catch-all
+// mount is safe and correct.
 //
 // When cfg.AuthEnabled is true, the MCP handler is wrapped with
 // newAuthHTTPMiddleware which validates the JWT Bearer token at the HTTP layer
@@ -52,11 +55,11 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", handler)
+	mux.Handle("/", handler)
 
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
 	Info("Starting HTTP server", "addr", addr)
-	Info("MCP endpoint", "url", fmt.Sprintf("http://%s:%s/mcp", cfg.Host, cfg.Port))
+	Info("MCP endpoint", "url", fmt.Sprintf("http://%s/", addr))
 
 	srv := &http.Server{
 		Addr:         addr,

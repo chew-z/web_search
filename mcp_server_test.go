@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,6 +90,55 @@ func TestMCPServer_HTTP_HealthRoute(t *testing.T) {
 
 			if resp.StatusCode != tt.wantStatus {
 				t.Fatalf("unexpected status for %s %s: got %d, want %d", tt.method, tt.path, resp.StatusCode, tt.wantStatus)
+			}
+		})
+	}
+}
+
+// TestMCPServer_HTTP_ProxiedPaths verifies the MCP handler responds to POST
+// initialize at any path — critical for reverse proxies (like nginx with
+// variable proxy_pass) that forward the original URI instead of rewriting it.
+func TestMCPServer_HTTP_ProxiedPaths(t *testing.T) {
+	t.Parallel()
+
+	handler := newTestMCPHandler(t)
+	srv, baseURL := newHTTPServerFromHandler(t, handler)
+	_ = srv
+
+	initBody := `{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1"}}}`
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "direct /mcp", path: "/mcp"},
+		{name: "proxied /answer/mcp", path: "/answer/mcp"},
+		{name: "proxied /prefix/deep/mcp", path: "/prefix/deep/mcp"},
+		{name: "root /", path: "/"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := withTimeout(t, 2*time.Second)
+			defer cancel()
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+tt.path, strings.NewReader(initBody))
+			if err != nil {
+				t.Fatalf("new request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("http do: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				t.Fatalf("POST %s: got %d, want 200, body: %s", tt.path, resp.StatusCode, body)
 			}
 		})
 	}
