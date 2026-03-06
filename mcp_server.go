@@ -91,9 +91,18 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 	return mcpServer
 }
 
-// webSearchHandler returns a handler for the web search tool
+// webSearchHandler returns a handler for the web search tool.
+// Authentication is enforced at the HTTP transport layer (newAuthHTTPMiddleware)
+// before this handler is ever reached; no auth logic is needed here.
+// User identity is logged opportunistically when present in the context
+// (set by the middleware on authenticated HTTP requests).
 func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Log authenticated user when identity is available (HTTP transport).
+		if userID, username, _ := getUserInfo(ctx); userID != "" {
+			logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("authenticated user: %s (%s)", username, userID))
+		}
+
 		// Extract parameters
 		query, err := request.RequireString("query")
 		if err != nil {

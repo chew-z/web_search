@@ -23,6 +23,9 @@ func newTestMCPHandler(t *testing.T) http.Handler {
 		"0",            // Port (unused; we mount handler via httptest server)
 		"127.0.0.1",    // Host
 		false,          // Verbose
+		false,          // AuthEnabled
+		"",             // AuthSecretKey
+		0,              // Heartbeat
 	)
 	mcpServer := NewMCPServer(cfg)
 

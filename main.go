@@ -27,11 +27,13 @@ func runMCPMode() {
 	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
 
 	var (
-		transport = mcpFlags.String("t", "stdio", "Transport type (stdio or http)")
-		port      = mcpFlags.String("port", "8080", "HTTP server port")
-		host      = mcpFlags.String("host", "127.0.0.1", "HTTP server host (default: 127.0.0.1)")
-		baseURL   = mcpFlags.String("base", defaultBaseURL, "API base URL")
-		verbose   = mcpFlags.Bool("verbose", false, "Enable verbose logging")
+		transport   = mcpFlags.String("t", "stdio", "Transport type (stdio or http)")
+		port        = mcpFlags.String("port", "8080", "HTTP server port")
+		host        = mcpFlags.String("host", "127.0.0.1", "HTTP server host (default: 127.0.0.1)")
+		baseURL     = mcpFlags.String("base", defaultBaseURL, "API base URL")
+		verbose     = mcpFlags.Bool("verbose", false, "Enable verbose logging")
+		authEnabled = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires GEMINI_AUTH_SECRET_KEY env var)")
+		heartbeat   = mcpFlags.Duration("heartbeat", 30*time.Second, "SSE heartbeat interval for HTTP transport (0 to disable); keeps long-running requests alive through proxies")
 	)
 
 	// Also support long form for transport
@@ -61,8 +63,15 @@ func runMCPMode() {
 		os.Exit(1)
 	}
 
+	// Read auth secret from environment (same variable as GeminiMCP for interoperability)
+	authSecretKey := os.Getenv("GEMINI_AUTH_SECRET_KEY")
+	if *authEnabled && authSecretKey == "" {
+		Error("GEMINI_AUTH_SECRET_KEY must be set when --auth-enabled is used")
+		os.Exit(1)
+	}
+
 	// Create server configuration using the config helper
-	cfg := parseMCPConfig(envCfg.APIKey, *baseURL, *transport, *port, *host, *verbose)
+	cfg := parseMCPConfig(envCfg.APIKey, *baseURL, *transport, *port, *host, *verbose, *authEnabled, authSecretKey, *heartbeat)
 
 	// Create and run MCP server
 	mcpServer := NewMCPServer(cfg)
@@ -75,7 +84,7 @@ func runMCPMode() {
 			os.Exit(1)
 		}
 	case "http":
-		if err := RunHTTPTransport(mcpServer, cfg.Host, cfg.Port); err != nil {
+		if err := RunHTTPTransport(mcpServer, cfg); err != nil {
 			Error("HTTP transport error", "error", err)
 			os.Exit(1)
 		}

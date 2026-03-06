@@ -172,7 +172,7 @@ func TestLoadEnvConfig_Table(t *testing.T) {
 func TestParseMCPConfig_Defaults(t *testing.T) {
 	t.Parallel()
 
-	got := parseMCPConfig("", "", "", "", "", false)
+	got := parseMCPConfig("", "", "", "", "", false, false, "", 0)
 
 	if got.APIKey != "" {
 		t.Errorf("APIKey = %q, want empty", got.APIKey)
@@ -213,6 +213,9 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 		want.Port,
 		want.Host,
 		want.Verbose,
+		false, // AuthEnabled
+		"",    // AuthSecretKey
+		0,     // Heartbeat
 	)
 
 	if got != want {
