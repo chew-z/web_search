@@ -16,14 +16,13 @@ func newTestMCPHandler(t *testing.T) http.Handler {
 	t.Helper()
 
 	// Minimal MCP config; API key not required for /health.
-	cfg := parseMCPConfig(
-		"test-key",     // APIKey (unused by /health)
-		defaultBaseURL, // BaseURL
-		"http",         // Transport
-		"0",            // Port (unused; we mount handler via httptest server)
-		"127.0.0.1",    // Host
-		false,          // Verbose
-	)
+	cfg := parseMCPConfig(MCPConfigParams{
+		APIKey:    "test-key",
+		BaseURL:   defaultBaseURL,
+		Transport: "http",
+		Port:      "0",
+		Host:      "127.0.0.1",
+	})
 	mcpServer := NewMCPServer(cfg)
 
 	httpServer := server.NewStreamableHTTPServer(mcpServer)

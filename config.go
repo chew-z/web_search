@@ -81,12 +81,15 @@ type EnvConfig struct {
 
 // MCPConfig holds configuration for the MCP server
 type MCPConfig struct {
-	APIKey    string
-	BaseURL   string
-	Transport string
-	Port      string
-	Host      string
-	Verbose   bool
+	APIKey        string
+	BaseURL       string
+	Transport     string
+	Port          string
+	Host          string
+	Verbose       bool
+	AuthEnabled   bool
+	AuthSecretKey string
+	Heartbeat     time.Duration
 }
 
 // loadEnvConfig reads environment variables
@@ -159,28 +162,47 @@ func validateVerbosity(verbosity string) string {
 	}
 }
 
-// parseMCPConfig creates MCPConfig from environment and command line flags
-func parseMCPConfig(apiKey, baseURL, transport, port, host string, verbose bool) MCPConfig {
+// MCPConfigParams holds the raw input values for building an MCPConfig.
+// Using a struct avoids a long positional parameter list and makes call sites
+// readable without per-argument comments.
+type MCPConfigParams struct {
+	APIKey        string
+	BaseURL       string
+	Transport     string
+	Port          string
+	Host          string
+	Verbose       bool
+	AuthEnabled   bool
+	AuthSecretKey string
+	Heartbeat     time.Duration
+}
+
+// parseMCPConfig creates MCPConfig from the supplied parameters, applying
+// defaults where the caller left a field empty/zero.
+func parseMCPConfig(p MCPConfigParams) MCPConfig {
 	// Use defaults if not provided
-	if baseURL == "" {
-		baseURL = defaultBaseURL
+	if p.BaseURL == "" {
+		p.BaseURL = defaultBaseURL
 	}
-	if transport == "" {
-		transport = "stdio"
+	if p.Transport == "" {
+		p.Transport = "stdio"
 	}
-	if port == "" {
-		port = "8080"
+	if p.Port == "" {
+		p.Port = "8080"
 	}
-	if host == "" {
-		host = "127.0.0.1"
+	if p.Host == "" {
+		p.Host = "127.0.0.1"
 	}
 
 	return MCPConfig{
-		APIKey:    apiKey,
-		BaseURL:   baseURL,
-		Transport: transport,
-		Port:      port,
-		Host:      host,
-		Verbose:   verbose,
+		APIKey:        p.APIKey,
+		BaseURL:       p.BaseURL,
+		Transport:     p.Transport,
+		Port:          p.Port,
+		Host:          p.Host,
+		Verbose:       p.Verbose,
+		AuthEnabled:   p.AuthEnabled,
+		AuthSecretKey: p.AuthSecretKey,
+		Heartbeat:     p.Heartbeat,
 	}
 }
