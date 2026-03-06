@@ -3,8 +3,16 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/mark3labs/mcp-go/server"
+)
+
+// HTTP server timeouts to mitigate Slowloris-style DoS attacks.
+const (
+	httpReadTimeout  = 30 * time.Second
+	httpWriteTimeout = 10 * time.Minute // must accommodate the longest web-search (timeoutHigh = 10m)
+	httpIdleTimeout  = 120 * time.Second
 )
 
 // RunStdioTransport runs the MCP server using STDIO transport.
@@ -50,6 +58,12 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 	Info("Starting HTTP server", "addr", addr)
 	Info("MCP endpoint", "url", fmt.Sprintf("http://%s:%s/mcp", cfg.Host, cfg.Port))
 
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  httpReadTimeout,
+		WriteTimeout: httpWriteTimeout,
+		IdleTimeout:  httpIdleTimeout,
+	}
 	return srv.ListenAndServe()
 }

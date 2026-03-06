@@ -71,7 +71,17 @@ func runMCPMode() {
 	}
 
 	// Create server configuration using the config helper
-	cfg := parseMCPConfig(envCfg.APIKey, *baseURL, *transport, *port, *host, *verbose, *authEnabled, authSecretKey, *heartbeat)
+	cfg := parseMCPConfig(MCPConfigParams{
+		APIKey:        envCfg.APIKey,
+		BaseURL:       *baseURL,
+		Transport:     *transport,
+		Port:          *port,
+		Host:          *host,
+		Verbose:       *verbose,
+		AuthEnabled:   *authEnabled,
+		AuthSecretKey: authSecretKey,
+		Heartbeat:     *heartbeat,
+	})
 
 	// Create and run MCP server
 	mcpServer := NewMCPServer(cfg)

@@ -172,7 +172,7 @@ func TestLoadEnvConfig_Table(t *testing.T) {
 func TestParseMCPConfig_Defaults(t *testing.T) {
 	t.Parallel()
 
-	got := parseMCPConfig("", "", "", "", "", false, false, "", 0)
+	got := parseMCPConfig(MCPConfigParams{})
 
 	if got.APIKey != "" {
 		t.Errorf("APIKey = %q, want empty", got.APIKey)
@@ -198,25 +198,28 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 	t.Parallel()
 
 	want := MCPConfig{
-		APIKey:    "k",
-		BaseURL:   "http://example.local",
-		Transport: "http",
-		Port:      "9090",
-		Host:      "0.0.0.0",
-		Verbose:   true,
+		APIKey:        "k",
+		BaseURL:       "http://example.local",
+		Transport:     "http",
+		Port:          "9090",
+		Host:          "0.0.0.0",
+		Verbose:       true,
+		AuthEnabled:   true,
+		AuthSecretKey: "secret",
+		Heartbeat:     15 * time.Second,
 	}
 
-	got := parseMCPConfig(
-		want.APIKey,
-		want.BaseURL,
-		want.Transport,
-		want.Port,
-		want.Host,
-		want.Verbose,
-		false, // AuthEnabled
-		"",    // AuthSecretKey
-		0,     // Heartbeat
-	)
+	got := parseMCPConfig(MCPConfigParams{
+		APIKey:        want.APIKey,
+		BaseURL:       want.BaseURL,
+		Transport:     want.Transport,
+		Port:          want.Port,
+		Host:          want.Host,
+		Verbose:       want.Verbose,
+		AuthEnabled:   want.AuthEnabled,
+		AuthSecretKey: want.AuthSecretKey,
+		Heartbeat:     want.Heartbeat,
+	})
 
 	if got != want {
 		t.Errorf("parseMCPConfig = %+v, want %+v", got, want)
