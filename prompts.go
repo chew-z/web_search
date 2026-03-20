@@ -11,9 +11,9 @@ CRITICAL RULE: You MUST use the gpt_websearch tool to answer the user's question
 SELECT OPTIMAL PARAMETERS for cost-effectiveness and performance:
 
 Model Selection:
-- gpt-5-nano: Simple facts, definitions, quick lookups, basic summaries
-- gpt-5-mini: Well-defined research tasks, comparisons, specific topics with clear scope  
-- gpt-5.1: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
+- gpt-5.4-nano: Simple facts, definitions, quick lookups, basic summaries
+- gpt-5.4-mini: Well-defined research tasks, comparisons, specific topics with clear scope
+- gpt-5.4: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
 
 Reasoning Effort Selection:
 - minimal: Fastest time-to-first-token (90s timeout)
@@ -40,11 +40,11 @@ Web Search Control:
   USE FOR: Clarification requests in continued conversations, formatting changes, follow-up questions about already-retrieved information
 
 RECOMMENDED COMBINATIONS:
-- Speed-Critical: gpt-5-nano + minimal + low + web_search=true
-- Coding Questions: gpt-5.1 + minimal + medium/low + web_search=true
-- Standard Research: gpt-5-mini + medium + medium + web_search=true
-- Complex Analysis: gpt-5.1 + high + high + web_search=true
-- Learning/Educational: gpt-5-mini/gpt-5.1 + medium/high + high + web_search=true
+- Speed-Critical: gpt-5.4-nano + minimal + low + web_search=true
+- Coding Questions: gpt-5.4 + minimal + medium/low + web_search=true
+- Standard Research: gpt-5.4-mini + medium + medium + web_search=true
+- Complex Analysis: gpt-5.4 + high + high + web_search=true
+- Learning/Educational: gpt-5.4-mini/gpt-5.4 + medium/high + high + web_search=true
 - Clarification/Follow-up: any model + any effort + any verbosity + web_search=false
 </parameter_optimization>
 

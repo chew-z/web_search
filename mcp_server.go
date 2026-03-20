@@ -42,7 +42,7 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 			),
 			mcp.WithString("model",
 				mcp.DefaultString(defaultModel),
-				mcp.Description("The GPT model to use (default: gpt-5-mini)"),
+				mcp.Description("The GPT model to use (default: gpt-5.4-mini)"),
 			),
 			mcp.WithString("reasoning_effort",
 				mcp.DefaultString(defaultEffort),

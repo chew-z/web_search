@@ -8,7 +8,7 @@ import (
 
 const (
 	// Default values
-	defaultModel     = "gpt-5-mini"
+	defaultModel     = "gpt-5.4-mini"
 	defaultEffort    = "medium"
 	defaultVerbosity = "medium"
 	defaultBaseURL   = "https://api.openai.com/v1/responses"
