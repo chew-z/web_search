@@ -41,7 +41,7 @@ Web Search Control:
 
 RECOMMENDED COMBINATIONS:
 - Speed-Critical: gpt-5.4-nano + minimal + low + web_search=true
-- Coding Questions: gpt-5.4 + minimal + medium/low + web_search=true
+- Coding Questions: gpt-5.4 + minimal + medium + web_search=true
 - Standard Research: gpt-5.4-mini + medium + medium + web_search=true
 - Complex Analysis: gpt-5.4 + high + high + web_search=true
 - Learning/Educational: gpt-5.4-mini/gpt-5.4 + medium/high + high + web_search=true

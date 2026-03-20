@@ -8,7 +8,12 @@ import (
 
 const (
 	// Default values
-	defaultModel     = "gpt-5.4-mini"
+	defaultModel = "gpt-5.4-mini"
+
+	// Named model constants
+	modelNano        = "gpt-5.4-nano"
+	modelMini        = "gpt-5.4-mini"
+	modelFull        = "gpt-5.4"
 	defaultEffort    = "medium"
 	defaultVerbosity = "medium"
 	defaultBaseURL   = "https://api.openai.com/v1/responses"

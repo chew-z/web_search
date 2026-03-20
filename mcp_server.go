@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -74,6 +75,17 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 			mcp.WithMIMEType("text/plain"),
 		),
 		serverInfoHandler(cfg.BaseURL),
+	)
+
+	// Add models list resource
+	mcpServer.AddResource(
+		mcp.NewResource(
+			"models://list",
+			"Available Models",
+			mcp.WithResourceDescription("List of available GPT models with use cases and recommended parameters"),
+			mcp.WithMIMEType("application/json"),
+		),
+		modelsHandler(),
 	)
 
 	// Add intelligent web search prompt
@@ -155,6 +167,61 @@ func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceReq
 				URI:      request.Params.URI,
 				MIMEType: "text/plain",
 				Text:     info,
+			},
+		}, nil
+	}
+}
+
+// modelsHandler returns a handler for the models list resource
+func modelsHandler() func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	type modelEntry struct {
+		Name              string `json:"name"`
+		Description       string `json:"description"`
+		RecommendedEffort string `json:"recommended_effort"`
+		Timeout           string `json:"timeout"`
+	}
+	type modelsPayload struct {
+		Default string       `json:"default"`
+		Models  []modelEntry `json:"models"`
+	}
+
+	payload := modelsPayload{
+		Default: modelMini,
+		Models: []modelEntry{
+			{
+				Name:              modelNano,
+				Description:       "Simple facts, definitions, quick lookups, basic summaries",
+				RecommendedEffort: "minimal",
+				Timeout:           "90s",
+			},
+			{
+				Name:              modelMini,
+				Description:       "Well-defined research tasks, comparisons, specific topics with clear scope",
+				RecommendedEffort: "medium",
+				Timeout:           "5m",
+			},
+			{
+				Name:              modelFull,
+				Description:       "Complex analysis, coding questions, multi-faceted problems, reasoning tasks",
+				RecommendedEffort: "high",
+				Timeout:           "10m",
+			},
+		},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		data = []byte(`{"error":"failed to marshal models"}`)
+	}
+	text := string(data)
+
+	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		logToClient(ctx, mcp.LoggingLevelDebug, "models_list", fmt.Sprintf("Models list resource accessed: URI=%s", request.Params.URI))
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "application/json",
+				Text:     text,
 			},
 		}, nil
 	}
