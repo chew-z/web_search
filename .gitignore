@@ -22,6 +22,7 @@ container-run.toml
 # Ephemral research reports and retired docs
 docs/reports/
 docs/retired/
+tmp/
 
 .claude/
 .codex/
@@ -29,7 +30,6 @@ docs/retired/
 .vscode/
 
 .mcp.json
-
 .codanna/
 .codannaignore
 # local folder
