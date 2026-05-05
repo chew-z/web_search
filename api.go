@@ -31,25 +31,38 @@ var httpClient = &http.Client{
 	},
 }
 
+// CallAPIParams groups the inputs for CallAPI to keep the signature readable.
+type CallAPIParams struct {
+	APIKey             string
+	BaseURL            string
+	Query              string
+	Model              string
+	Effort             string
+	Verbosity          string
+	PreviousResponseID string
+	Timeout            time.Duration
+	UseWebSearch       bool
+}
+
 // CallAPI makes the actual API call - reusable for both CLI and MCP
-func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosity, previousResponseID string, timeout time.Duration, useWebSearch bool) (*apiResponse, error) {
-	if apiKey == "" {
+func CallAPI(ctx context.Context, p CallAPIParams) (*apiResponse, error) {
+	if p.APIKey == "" {
 		return nil, ErrNoAPIKey
 	}
 	body := requestBody{
-		Model: model,
-		Input: query,
+		Model: p.Model,
+		Input: p.Query,
 		Reasoning: reqReasoning{
-			Effort: effort,
+			Effort: p.Effort,
 		},
 		Text: reqText{
-			Verbosity: verbosity,
+			Verbosity: p.Verbosity,
 		},
-		PreviousResponseID: previousResponseID,
+		PreviousResponseID: p.PreviousResponseID,
 	}
 
 	// Conditionally add web search tool
-	if useWebSearch {
+	if p.UseWebSearch {
 		body.Tools = []reqTool{
 			{Type: "web_search_preview"},
 		}
@@ -60,15 +73,15 @@ func CallAPI(ctx context.Context, apiKey, baseURL, query, model, effort, verbosi
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, p.Timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, bytes.NewReader(buf))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.BaseURL, bytes.NewReader(buf))
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -159,7 +172,17 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	timeout := getTimeoutForEffort(effort)
 
 	// Make API call with determined web search setting
-	apiResp, err := CallAPI(ctx, apiKey, baseURL, query, model, effort, verbosity, previousResponseID, timeout, useWebSearch)
+	apiResp, err := CallAPI(ctx, CallAPIParams{
+		APIKey:             apiKey,
+		BaseURL:            baseURL,
+		Query:              query,
+		Model:              model,
+		Effort:             effort,
+		Verbosity:          verbosity,
+		PreviousResponseID: previousResponseID,
+		Timeout:            timeout,
+		UseWebSearch:       useWebSearch,
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -45,6 +45,8 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 		mcpOpts = append(mcpOpts, server.WithHeartbeatInterval(cfg.Heartbeat))
 	}
 
+	mcpOpts = append(mcpOpts, server.WithLogger(mcpGoLogger()))
+
 	mcpHandler := server.NewStreamableHTTPServer(mcpServer, mcpOpts...)
 
 	// Optionally wrap with auth middleware for a real HTTP 401 before MCP init.

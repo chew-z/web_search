@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
+
+	"github.com/mark3labs/mcp-go/util"
 )
 
 // Centralized structured logger using slog with dynamic level control.
@@ -66,3 +69,13 @@ func ensureLogger() {
 		initLogger(false)
 	}
 }
+
+// mcpLogAdapter bridges mcp-go's util.Logger interface to our slog setup.
+type mcpLogAdapter struct{}
+
+func (mcpLogAdapter) Infof(format string, v ...any)  { Info(fmt.Sprintf(format, v...)) }
+func (mcpLogAdapter) Errorf(format string, v ...any) { Error(fmt.Sprintf(format, v...)) }
+
+var _ util.Logger = mcpLogAdapter{}
+
+func mcpGoLogger() util.Logger { return mcpLogAdapter{} }

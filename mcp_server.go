@@ -31,40 +31,15 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 		server.WithToolCapabilities(true),
 		server.WithResourceCapabilities(true, false),
 		server.WithPromptCapabilities(true),
+		server.WithTitle(serverTitle),
+		server.WithWebsiteURL(serverWebsiteURL),
+		server.WithRecovery(),
+		server.WithInputSchemaValidation(),
+		server.WithOutputSchemaValidation(),
 	)
 
 	// Add web search tool
-	mcpServer.AddTool(
-		mcp.NewTool("gpt_websearch",
-			mcp.WithDescription("Search the web using OpenAI's GPT model with web search capabilities"),
-			mcp.WithString("query",
-				mcp.Required(),
-				mcp.Description("The search query or question to ask"),
-			),
-			mcp.WithString("model",
-				mcp.DefaultString(defaultModel),
-				mcp.Description("The GPT model to use (default: gpt-5.4-mini)"),
-			),
-			mcp.WithString("reasoning_effort",
-				mcp.DefaultString(defaultEffort),
-				mcp.Description("Reasoning effort level: minimal (90s), low (3min), medium (5min), or high (10min timeout)"),
-				mcp.Enum("minimal", "low", "medium", "high"),
-			),
-			mcp.WithString("verbosity",
-				mcp.DefaultString(defaultVerbosity),
-				mcp.Description("Response verbosity level: low (concise), medium (balanced), or high (detailed with explanations)"),
-				mcp.Enum("low", "medium", "high"),
-			),
-			mcp.WithString("previous_response_id",
-				mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
-			),
-			mcp.WithBoolean("web_search",
-				mcp.DefaultBool(true),
-				mcp.Description("Use web search (default: true)"),
-			),
-		),
-		webSearchHandler(cfg.APIKey, cfg.BaseURL),
-	)
+	mcpServer.AddTool(newGptWebsearchTool(), webSearchHandler(cfg.APIKey, cfg.BaseURL))
 
 	// Add server info resource
 	mcpServer.AddResource(
@@ -101,6 +76,42 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 	)
 
 	return mcpServer
+}
+
+// newGptWebsearchTool builds the gpt_websearch tool definition with input
+// validation (additionalProperties:false, enum constraints) and a structured
+// output schema derived from WebSearchResult.
+func newGptWebsearchTool() mcp.Tool {
+	return mcp.NewTool("gpt_websearch",
+		mcp.WithDescription("Search the web using OpenAI's GPT model with web search capabilities"),
+		mcp.WithString("query",
+			mcp.Required(),
+			mcp.Description("The search query or question to ask"),
+		),
+		mcp.WithString("model",
+			mcp.DefaultString(defaultModel),
+			mcp.Description("The GPT model to use (default: gpt-5.4-mini)"),
+		),
+		mcp.WithString("reasoning_effort",
+			mcp.DefaultString(defaultEffort),
+			mcp.Description("Reasoning effort level: minimal (90s), low (3min), medium (5min), or high (10min timeout)"),
+			mcp.Enum("minimal", "low", "medium", "high"),
+		),
+		mcp.WithString("verbosity",
+			mcp.DefaultString(defaultVerbosity),
+			mcp.Description("Response verbosity level: low (concise), medium (balanced), or high (detailed with explanations)"),
+			mcp.Enum("low", "medium", "high"),
+		),
+		mcp.WithString("previous_response_id",
+			mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
+		),
+		mcp.WithBoolean("web_search",
+			mcp.DefaultBool(true),
+			mcp.Description("Use web search (default: true)"),
+		),
+		mcp.WithSchemaAdditionalProperties(false),
+		mcp.WithOutputSchema[WebSearchResult](),
+	)
 }
 
 // webSearchHandler returns a handler for the web search tool.

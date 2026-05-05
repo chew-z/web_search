@@ -19,8 +19,10 @@ const (
 	defaultBaseURL   = "https://api.openai.com/v1/responses"
 
 	// Server metadata
-	serverName    = "gpt-websearch-mcp"
-	serverVersion = "0.3.5"
+	serverName       = "gpt-websearch-mcp"
+	serverTitle      = "GPT Web Search"
+	serverVersion    = "0.3.5"
+	serverWebsiteURL = "https://github.com/chew-z/web_search"
 
 	// Timeouts based on reasoning effort
 	timeoutMinimal = 90 * time.Second
