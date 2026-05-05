@@ -33,7 +33,8 @@ func runMCPMode() {
 		baseURL     = mcpFlags.String("base", defaultBaseURL, "API base URL")
 		verbose     = mcpFlags.Bool("verbose", false, "Enable verbose logging")
 		authEnabled = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires GEMINI_AUTH_SECRET_KEY env var)")
-		heartbeat   = mcpFlags.Duration("heartbeat", 30*time.Second, "SSE heartbeat interval for HTTP transport (0 to disable); keeps long-running requests alive through proxies")
+		heartbeat   = mcpFlags.Duration("heartbeat", 30*time.Second,
+			"SSE heartbeat interval for HTTP transport (0 to disable); keeps long-running requests alive through proxies")
 	)
 
 	// Also support long form for transport
@@ -104,98 +105,116 @@ func runMCPMode() {
 	}
 }
 
+// cliArgs holds the resolved command-line + environment configuration for runCLI.
+type cliArgs struct {
+	baseURL      string
+	model        string
+	effort       string
+	verbosity    string
+	question     string
+	timeout      time.Duration
+	useWebSearch bool
+	showAll      bool
+}
+
+func parseCLIArgs(envCfg EnvConfig) cliArgs {
+	defaultModelVal := defaultModel
+	if envCfg.Model != "" {
+		defaultModelVal = envCfg.Model
+	}
+	defaultEffortVal := defaultEffort
+	if envCfg.Effort != "" {
+		defaultEffortVal = envCfg.Effort
+	}
+
+	baseURL := flag.String("base", defaultBaseURL, "API endpoint")
+	model := flag.String("model", defaultModelVal, "model (env MODEL)")
+	effort := flag.String("effort", defaultEffortVal, "effort (env EFFORT)")
+	verbosity := flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
+	webSearch := flag.Bool("web-search", true, "use web search (default: true)")
+	defaultTimeout := getTimeoutForEffort(defaultEffortVal)
+	if envCfg.HasTimeout {
+		defaultTimeout = envCfg.Timeout
+	}
+	timeout := flag.Duration("timeout", defaultTimeout, "HTTP timeout (env TIMEOUT)")
+	showAll := flag.Bool("show-all", envCfg.HasShowAll && envCfg.ShowAll, "print raw JSON response (env SHOW_ALL)")
+
+	var questionVal string
+	flag.StringVar(&questionVal, "q", envCfg.Question, "question prompt (env QUESTION)")
+	flag.StringVar(&questionVal, "question", envCfg.Question, "same as -q (env QUESTION)")
+	flag.Parse()
+
+	q := resolveQuestion(questionVal)
+	*effort = validateEffort(*effort)
+	*verbosity = validateVerbosity(*verbosity)
+	if !envCfg.HasTimeout && !flagWasSet("timeout") {
+		*timeout = getTimeoutForEffort(*effort)
+	}
+
+	return cliArgs{
+		baseURL:      *baseURL,
+		model:        *model,
+		effort:       *effort,
+		verbosity:    *verbosity,
+		question:     q,
+		timeout:      *timeout,
+		useWebSearch: *webSearch,
+		showAll:      *showAll,
+	}
+}
+
+func resolveQuestion(questionVal string) string {
+	if flagWasSet("q") || flagWasSet("question") {
+		return questionVal
+	}
+	if flag.NArg() > 0 {
+		return flag.Arg(0)
+	}
+	return questionVal
+}
+
+func flagWasSet(name string) bool {
+	var set bool
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
+}
+
 func runCLI() {
-	// Load environment-backed configuration
 	envCfg, err := loadEnvConfig()
 	if err != nil {
 		fail(2, err.Error())
 	}
 
-	// Parse CLI flags
-	var (
-		baseURL = flag.String("base", defaultBaseURL, "API endpoint")
-		model   = flag.String("model", func() string {
-			if envCfg.Model != "" {
-				return envCfg.Model
-			}
-			return defaultModel
-		}(), "model (env MODEL)")
-		effort = flag.String("effort", func() string {
-			if envCfg.Effort != "" {
-				return envCfg.Effort
-			}
-			return defaultEffort
-		}(), "effort (env EFFORT)")
-		verbosity   = flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
-		webSearch   = flag.Bool("web-search", true, "use web search (default: true)")
-		questionVal string
-		timeout     = flag.Duration("timeout", func() time.Duration {
-			if envCfg.HasTimeout {
-				return envCfg.Timeout
-			}
-			return getTimeoutForEffort(*effort)
-		}(), "HTTP timeout (env TIMEOUT)")
-		showAll = flag.Bool("show-all", func() bool {
-			if envCfg.HasShowAll {
-				return envCfg.ShowAll
-			}
-			return false
-		}(), "print raw JSON response (env SHOW_ALL)")
-	)
-	flag.StringVar(&questionVal, "q", envCfg.Question, "question prompt (env QUESTION)")
-	flag.StringVar(&questionVal, "question", envCfg.Question, "same as -q (env QUESTION)")
-	flag.Parse()
-
-	// Determine the final question value
-	q := questionVal
-	var questionFlagSet bool
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "q" || f.Name == "question" {
-			questionFlagSet = true
-		}
-	})
-	if !questionFlagSet {
-		if flag.NArg() > 0 {
-			q = flag.Arg(0)
-		}
-	}
-	if q == "" {
+	args := parseCLIArgs(envCfg)
+	if args.question == "" {
 		fail(2, "please provide a question to ask (use -q flag or positional argument)")
 	}
 
-	// Validate effort and verbosity parameters
-	*effort = validateEffort(*effort)
-	*verbosity = validateVerbosity(*verbosity)
-
-	// Use web search flag directly
-	useWebSearch := *webSearch
-
-	// Only override timeout if neither env nor CLI provided it
-	var timeoutFlagSet bool
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "timeout" {
-			timeoutFlagSet = true
-		}
-	})
-	if !envCfg.HasTimeout && !timeoutFlagSet {
-		*timeout = getTimeoutForEffort(*effort)
-	}
-
-	// Make API call with determined web search setting
 	ctx := context.Background()
-	apiResp, err := CallAPI(ctx, envCfg.APIKey, *baseURL, q, *model, *effort, *verbosity, "", *timeout, useWebSearch)
+	apiResp, err := CallAPI(ctx, CallAPIParams{
+		APIKey:       envCfg.APIKey,
+		BaseURL:      args.baseURL,
+		Query:        args.question,
+		Model:        args.model,
+		Effort:       args.effort,
+		Verbosity:    args.verbosity,
+		Timeout:      args.timeout,
+		UseWebSearch: args.useWebSearch,
+	})
 	if err != nil {
 		fail(2, err.Error())
 	}
 
-	if *showAll {
-		// Print the full raw JSON when requested
+	if args.showAll {
 		raw, _ := json.MarshalIndent(apiResp, "", "  ") //nolint:errcheck // Debug output, error ok to ignore
 		fmt.Println(string(raw))
 		return
 	}
 
-	// Extract and print the answer
 	answer := ExtractAnswer(apiResp)
 	if answer == "" {
 		fail(3, "no answer found in response")

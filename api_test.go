@@ -104,7 +104,17 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	apiResp, err := CallAPI(ctx, os.Getenv("OPENAI_API_KEY"), base+"/v1/test", "test query", "test-model", "test-effort", "test-verbosity", "test-prev-id", 2*time.Second, true)
+	apiResp, err := CallAPI(ctx, CallAPIParams{
+		APIKey:             os.Getenv("OPENAI_API_KEY"),
+		BaseURL:            base + "/v1/test",
+		Query:              "test query",
+		Model:              "test-model",
+		Effort:             "test-effort",
+		Verbosity:          "test-verbosity",
+		PreviousResponseID: "test-prev-id",
+		Timeout:            2 * time.Second,
+		UseWebSearch:       true,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +175,16 @@ func TestCallAPI_Success_WebSearchFalse_OmitsTools(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	apiResp, err := CallAPI(ctx, os.Getenv("OPENAI_API_KEY"), base+"/v1/omit-tools", "q", "m", "e", "v", "", 2*time.Second, false)
+	apiResp, err := CallAPI(ctx, CallAPIParams{
+		APIKey:       os.Getenv("OPENAI_API_KEY"),
+		BaseURL:      base + "/v1/omit-tools",
+		Query:        "q",
+		Model:        "m",
+		Effort:       "e",
+		Verbosity:    "v",
+		Timeout:      2 * time.Second,
+		UseWebSearch: false,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,7 +207,16 @@ func TestCallAPI_MalformedJSONResponse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_, err := CallAPI(ctx, os.Getenv("OPENAI_API_KEY"), base+"/v1/bad-json", "q", "m", "e", "v", "", 2*time.Second, true)
+	_, err := CallAPI(ctx, CallAPIParams{
+		APIKey:       os.Getenv("OPENAI_API_KEY"),
+		BaseURL:      base + "/v1/bad-json",
+		Query:        "q",
+		Model:        "m",
+		Effort:       "e",
+		Verbosity:    "v",
+		Timeout:      2 * time.Second,
+		UseWebSearch: true,
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -227,7 +255,16 @@ func TestCallAPI_Non2xxErrors_401_403_429(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			_, err := CallAPI(ctx, os.Getenv("OPENAI_API_KEY"), base+"/v1/error", "q", "m", "e", "v", "", 2*time.Second, true)
+			_, err := CallAPI(ctx, CallAPIParams{
+				APIKey:       os.Getenv("OPENAI_API_KEY"),
+				BaseURL:      base + "/v1/error",
+				Query:        "q",
+				Model:        "m",
+				Effort:       "e",
+				Verbosity:    "v",
+				Timeout:      2 * time.Second,
+				UseWebSearch: true,
+			})
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -258,7 +295,16 @@ func TestCallAPI_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	_, err := CallAPI(ctx, os.Getenv("OPENAI_API_KEY"), base+"/slow", "q", "m", "e", "v", "", 50*time.Millisecond, true)
+	_, err := CallAPI(ctx, CallAPIParams{
+		APIKey:       os.Getenv("OPENAI_API_KEY"),
+		BaseURL:      base + "/slow",
+		Query:        "q",
+		Model:        "m",
+		Effort:       "e",
+		Verbosity:    "v",
+		Timeout:      50 * time.Millisecond,
+		UseWebSearch: true,
+	})
 	if err == nil {
 		t.Fatal("expected timeout error, got nil")
 	}
@@ -284,7 +330,16 @@ func TestCallAPI_MissingAPIKey(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	_, err := CallAPI(ctx, os.Getenv("OPENAI_API_KEY"), base+"/auth-check", "q", "m", "e", "v", "", 1*time.Second, true)
+	_, err := CallAPI(ctx, CallAPIParams{
+		APIKey:       os.Getenv("OPENAI_API_KEY"),
+		BaseURL:      base + "/auth-check",
+		Query:        "q",
+		Model:        "m",
+		Effort:       "e",
+		Verbosity:    "v",
+		Timeout:      1 * time.Second,
+		UseWebSearch: true,
+	})
 	if !errors.Is(err, ErrNoAPIKey) {
 		t.Fatalf("expected ErrNoAPIKey, got %v", err)
 	}

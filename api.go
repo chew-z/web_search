@@ -129,38 +129,32 @@ func ExtractAnswer(apiResp *apiResponse) string {
 	return sb.String()
 }
 
-// HandleWebSearch handles web search requests for the MCP server
-func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (*WebSearchResult, error) {
-	// Extract optional previous response id first for consistent population
+// webSearchArgs holds the validated arguments extracted from a tool-call map.
+type webSearchArgs struct {
+	query              string
+	model              string
+	effort             string
+	verbosity          string
+	previousResponseID string
+	useWebSearch       bool
+}
+
+func extractWebSearchArgs(args map[string]interface{}) webSearchArgs {
 	previousResponseID, _ := args["previous_response_id"].(string) //nolint:errcheck
 
-	// Extract parameters
-	query, ok := args["query"].(string)
-	if !ok || query == "" {
-		errMsg := "Please provide a query to search for"
-		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
-		return &WebSearchResult{
-				Success:            false,
-				Error:              errMsg,
-				Query:              query,
-				WebSearchUsed:      false,
-				PreviousResponseID: previousResponseID,
-			},
-			nil
-	}
+	query, _ := args["query"].(string) //nolint:errcheck
 
-	model, _ := args["model"].(string) //nolint:errcheck // Type assertion ok to ignore
+	model, _ := args["model"].(string) //nolint:errcheck
 	if model == "" {
 		model = defaultModel
 	}
 
-	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck // Type assertion ok to ignore
+	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck
 	effort = validateEffort(effort)
 
-	verbosity, _ := args["verbosity"].(string) //nolint:errcheck // Type assertion ok to ignore
+	verbosity, _ := args["verbosity"].(string) //nolint:errcheck
 	verbosity = validateVerbosity(verbosity)
 
-	// Extract web search parameter (defaults to true)
 	useWebSearch := true
 	if webSearchVal, exists := args["web_search"]; exists {
 		if webSearchBool, ok := webSearchVal.(bool); ok {
@@ -168,10 +162,34 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 		}
 	}
 
-	// Use effort-based timeout
+	return webSearchArgs{
+		query:              query,
+		model:              model,
+		effort:             effort,
+		verbosity:          verbosity,
+		previousResponseID: previousResponseID,
+		useWebSearch:       useWebSearch,
+	}
+}
+
+// HandleWebSearch handles web search requests for the MCP server
+func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (*WebSearchResult, error) {
+	wa := extractWebSearchArgs(args)
+	if wa.query == "" {
+		errMsg := "Please provide a query to search for"
+		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
+		return &WebSearchResult{
+			Success:            false,
+			Error:              errMsg,
+			WebSearchUsed:      false,
+			PreviousResponseID: wa.previousResponseID,
+		}, nil
+	}
+
+	query, model, effort, verbosity := wa.query, wa.model, wa.effort, wa.verbosity
+	previousResponseID, useWebSearch := wa.previousResponseID, wa.useWebSearch
 	timeout := getTimeoutForEffort(effort)
 
-	// Make API call with determined web search setting
 	apiResp, err := CallAPI(ctx, CallAPIParams{
 		APIKey:             apiKey,
 		BaseURL:            baseURL,

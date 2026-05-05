@@ -140,7 +140,9 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		webSearch := request.GetBool("web_search", true)
 
 		// Log the search request
-		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%t'", query, model, effort, verbosity, webSearch))
+		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf(
+			"Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%t'",
+			query, model, effort, verbosity, webSearch))
 
 		// Call handler with properly extracted values
 		args := map[string]interface{}{

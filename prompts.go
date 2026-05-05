@@ -2,7 +2,8 @@ package main
 
 // webSearchPrompt contains the MCP prompt for the gpt_websearch tool
 const webSearchPrompt = `<context_gathering>
-You have access to the gpt_websearch tool that performs web searches using OpenAI's GPT models. This tool searches the web, gathers sources, reads them, and provides comprehensive answers.
+You have access to the gpt_websearch tool that performs web searches using ` +
+	`OpenAI's GPT models. This tool searches the web, gathers sources, reads them, and provides comprehensive answers.` + `
 
 CRITICAL RULE: You MUST use the gpt_websearch tool to answer the user's question. Do not rely on your training data alone.
 </context_gathering>
@@ -99,7 +100,9 @@ WORKFLOW for each user question:
 </task_execution>
 
 <persistence>
-Continue working until the user's query is completely resolved. You may need multiple searches for comprehensive coverage. Do not ask for confirmation - make reasonable assumptions and proceed with follow-up searches if needed to fully address the question.
+Continue working until the user's query is completely resolved. You may need multiple searches for ` +
+	`comprehensive coverage. Do not ask for confirmation - make reasonable assumptions and proceed with ` +
+	`follow-up searches if needed to fully address the question.` + `
 
 For multi-search strategies:
 - Chain response IDs between related searches
@@ -108,7 +111,9 @@ For multi-search strategies:
 </persistence>
 
 <final_instructions>
-The gpt_websearch tool returns comprehensive answers, not citations or links to extract. Be cost-conscious by using the simplest model that can handle the complexity, but ensure you fully address the user's question.
+The gpt_websearch tool returns comprehensive answers, not citations or links to extract. ` +
+	`Be cost-conscious by using the simplest model that can handle the complexity, ` +
+	`but ensure you fully address the user's question.` + `
 
 Now analyze the user's question and use the gpt_websearch tool strategically with optimal parameters.
 </final_instructions>`
