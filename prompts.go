@@ -17,14 +17,16 @@ Model Selection:
 - gpt-5.4: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
 
 Reasoning Effort Selection:
-- minimal: Fastest time-to-first-token (90s timeout)
-  USE FOR: Coding questions, instruction following, simple factual lookups, speed-critical tasks
-- low: Quick responses for basic queries (3min timeout)
-  USE FOR: Simple definitions, straightforward lookups without complex reasoning
+- none: No internal reasoning, fastest time-to-first-token (90s timeout)
+  USE FOR: Instruction following, simple factual lookups, speed-critical tasks
+- low: Quick reasoning for basic queries (3min timeout)
+  USE FOR: Extraction, routing, classification, simple rewrites
 - medium: Balanced reasoning for moderate complexity (5min timeout, DEFAULT)
-  USE FOR: Research requiring synthesis, questions needing moderate analysis
+  USE FOR: Research requiring synthesis, diagnosing problems, comparing options
 - high: Deep analysis for complex tasks (10min timeout)
-  USE FOR: Multi-faceted problems, comprehensive research, detailed investigations
+  USE FOR: Writing plans, reasoning through code, multi-step tradeoffs
+- xhigh: Maximum-depth reasoning (15min timeout)
+  USE FOR: Cases where evals show the extra latency is worth it
 
 Verbosity Selection:
 - low: Concise responses with minimal commentary
@@ -41,10 +43,11 @@ Web Search Control:
   USE FOR: Clarification requests in continued conversations, formatting changes, follow-up questions about already-retrieved information
 
 RECOMMENDED COMBINATIONS:
-- Speed-Critical: gpt-5.4-nano + minimal + low + web_search=true
-- Coding Questions: gpt-5.4 + minimal + medium + web_search=true
+- Speed-Critical: gpt-5.4-nano + none + low + web_search=true
+- Coding Questions: gpt-5.4 + low + medium + web_search=true
 - Standard Research: gpt-5.4-mini + medium + medium + web_search=true
 - Complex Analysis: gpt-5.4 + high + high + web_search=true
+- Maximum Depth: gpt-5.4 + xhigh + high + web_search=true
 - Learning/Educational: gpt-5.4-mini/gpt-5.4 + medium/high + high + web_search=true
 - Clarification/Follow-up: any model + any effort + any verbosity + web_search=false
 </parameter_optimization>

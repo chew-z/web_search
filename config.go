@@ -24,11 +24,15 @@ const (
 	serverVersion    = "0.3.5"
 	serverWebsiteURL = "https://github.com/chew-z/web_search"
 
-	// Timeouts based on reasoning effort
-	timeoutMinimal = 90 * time.Second
-	timeoutLow     = 3 * time.Minute
-	timeoutMedium  = 5 * time.Minute
-	timeoutHigh    = 10 * time.Minute
+	// Timeouts based on reasoning effort.
+	// Enum mirrors what gpt-5.4-* / gpt-5.5 accept:
+	// none, low, medium, high, xhigh. "none" disables reasoning entirely;
+	// "xhigh" requests the deepest reasoning chain available.
+	timeoutNone   = 90 * time.Second
+	timeoutLow    = 3 * time.Minute
+	timeoutMedium = 5 * time.Minute
+	timeoutHigh   = 10 * time.Minute
+	timeoutXHigh  = 15 * time.Minute
 )
 
 // API request/response structures
@@ -51,6 +55,7 @@ type requestBody struct {
 	Text               reqText      `json:"text"`
 	Tools              []reqTool    `json:"tools,omitempty"`
 	PreviousResponseID string       `json:"previous_response_id,omitempty"`
+	PromptCacheKey     string       `json:"prompt_cache_key,omitempty"`
 }
 
 type respContent struct {
@@ -132,23 +137,27 @@ func loadEnvConfig() (EnvConfig, error) {
 // getTimeoutForEffort returns the appropriate timeout based on reasoning effort level
 func getTimeoutForEffort(effort string) time.Duration {
 	switch effort {
+	case "xhigh":
+		return timeoutXHigh
 	case "high":
 		return timeoutHigh
 	case "medium":
 		return timeoutMedium
 	case "low", "":
 		return timeoutLow
-	case "minimal":
-		return timeoutMinimal
+	case "none":
+		return timeoutNone
 	default:
 		return timeoutLow
 	}
 }
 
-// validateEffort ensures the effort level is valid
+// validateEffort ensures the effort level is valid for the gpt-5.4-* / gpt-5.5
+// family this server targets. The legacy "minimal" value (4o/4.1 only) is no
+// longer accepted.
 func validateEffort(effort string) string {
 	switch effort {
-	case "minimal", "low", "medium", "high":
+	case "none", "low", "medium", "high", "xhigh":
 		return effort
 	case "":
 		return defaultEffort

@@ -231,10 +231,11 @@ func TestGetTimeoutForEffort(t *testing.T) {
 		effort string
 		want   time.Duration
 	}{
-		{"minimal", timeoutMinimal},
+		{"none", timeoutNone},
 		{"low", timeoutLow},
 		{"medium", timeoutMedium},
 		{"high", timeoutHigh},
+		{"xhigh", timeoutXHigh},
 		{"", timeoutLow},        // empty maps to low per implementation
 		{"unknown", timeoutLow}, // unknown maps to low per implementation
 	}
@@ -255,10 +256,12 @@ func TestValidateEffort(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"minimal", "minimal"},
+		{"none", "none"},
 		{"low", "low"},
 		{"medium", "medium"},
 		{"high", "high"},
+		{"xhigh", "xhigh"},
+		{"minimal", defaultEffort}, // legacy 4o-only value, no longer accepted
 		{"", defaultEffort},
 		{"weird", defaultEffort},
 	}

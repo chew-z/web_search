@@ -40,6 +40,7 @@ type CallAPIParams struct {
 	Effort             string
 	Verbosity          string
 	PreviousResponseID string
+	PromptCacheKey     string
 	Timeout            time.Duration
 	UseWebSearch       bool
 }
@@ -59,6 +60,7 @@ func CallAPI(ctx context.Context, p CallAPIParams) (*apiResponse, error) {
 			Verbosity: p.Verbosity,
 		},
 		PreviousResponseID: p.PreviousResponseID,
+		PromptCacheKey:     p.PromptCacheKey,
 	}
 
 	// Conditionally add web search tool
@@ -136,6 +138,7 @@ type webSearchArgs struct {
 	effort             string
 	verbosity          string
 	previousResponseID string
+	promptCacheKey     string
 	useWebSearch       bool
 }
 
@@ -155,6 +158,8 @@ func extractWebSearchArgs(args map[string]interface{}) webSearchArgs {
 	verbosity, _ := args["verbosity"].(string) //nolint:errcheck
 	verbosity = validateVerbosity(verbosity)
 
+	promptCacheKey, _ := args["prompt_cache_key"].(string) //nolint:errcheck
+
 	useWebSearch := true
 	if webSearchVal, exists := args["web_search"]; exists {
 		if webSearchBool, ok := webSearchVal.(bool); ok {
@@ -168,8 +173,23 @@ func extractWebSearchArgs(args map[string]interface{}) webSearchArgs {
 		effort:             effort,
 		verbosity:          verbosity,
 		previousResponseID: previousResponseID,
+		promptCacheKey:     promptCacheKey,
 		useWebSearch:       useWebSearch,
 	}
+}
+
+// resolvePromptCacheKey picks the prompt_cache_key to send upstream:
+// caller-provided value wins; otherwise a per-authenticated-user shard
+// (when the request was authenticated); otherwise the server name as a
+// stable global default.
+func resolvePromptCacheKey(ctx context.Context, supplied string) string {
+	if supplied != "" {
+		return supplied
+	}
+	if userID, _ := getUserInfo(ctx); userID != "" {
+		return serverName + ":" + userID
+	}
+	return serverName
 }
 
 // HandleWebSearch handles web search requests for the MCP server
@@ -189,6 +209,7 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 	query, model, effort, verbosity := wa.query, wa.model, wa.effort, wa.verbosity
 	previousResponseID, useWebSearch := wa.previousResponseID, wa.useWebSearch
 	timeout := getTimeoutForEffort(effort)
+	cacheKey := resolvePromptCacheKey(ctx, wa.promptCacheKey)
 
 	apiResp, err := CallAPI(ctx, CallAPIParams{
 		APIKey:             apiKey,
@@ -198,6 +219,7 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[strin
 		Effort:             effort,
 		Verbosity:          verbosity,
 		PreviousResponseID: previousResponseID,
+		PromptCacheKey:     cacheKey,
 		Timeout:            timeout,
 		UseWebSearch:       useWebSearch,
 	})

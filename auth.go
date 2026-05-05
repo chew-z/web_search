@@ -129,9 +129,9 @@ func newAuthHTTPMiddleware(secretKey []byte, next http.Handler) http.Handler {
 
 // getUserInfo extracts user identity fields from the request context.
 // Returns empty strings when the context carries no identity (e.g. stdio).
-func getUserInfo(ctx context.Context) (userID, username, role string) {
+func getUserInfo(ctx context.Context) (userID, username string) {
 	if info, ok := ctx.Value(userInfoKey).(userInfo); ok {
-		return info.ID, info.Username, info.Role
+		return info.ID, info.Username
 	}
-	return "", "", ""
+	return "", ""
 }

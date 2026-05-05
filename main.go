@@ -107,14 +107,15 @@ func runMCPMode() {
 
 // cliArgs holds the resolved command-line + environment configuration for runCLI.
 type cliArgs struct {
-	baseURL      string
-	model        string
-	effort       string
-	verbosity    string
-	question     string
-	timeout      time.Duration
-	useWebSearch bool
-	showAll      bool
+	baseURL        string
+	model          string
+	effort         string
+	verbosity      string
+	question       string
+	promptCacheKey string
+	timeout        time.Duration
+	useWebSearch   bool
+	showAll        bool
 }
 
 func parseCLIArgs(envCfg EnvConfig) cliArgs {
@@ -138,6 +139,7 @@ func parseCLIArgs(envCfg EnvConfig) cliArgs {
 	}
 	timeout := flag.Duration("timeout", defaultTimeout, "HTTP timeout (env TIMEOUT)")
 	showAll := flag.Bool("show-all", envCfg.HasShowAll && envCfg.ShowAll, "print raw JSON response (env SHOW_ALL)")
+	cacheKey := flag.String("cache-key", os.Getenv("PROMPT_CACHE_KEY"), "OpenAI prompt_cache_key (env PROMPT_CACHE_KEY); leave empty for server default")
 
 	var questionVal string
 	flag.StringVar(&questionVal, "q", envCfg.Question, "question prompt (env QUESTION)")
@@ -152,14 +154,15 @@ func parseCLIArgs(envCfg EnvConfig) cliArgs {
 	}
 
 	return cliArgs{
-		baseURL:      *baseURL,
-		model:        *model,
-		effort:       *effort,
-		verbosity:    *verbosity,
-		question:     q,
-		timeout:      *timeout,
-		useWebSearch: *webSearch,
-		showAll:      *showAll,
+		baseURL:        *baseURL,
+		model:          *model,
+		effort:         *effort,
+		verbosity:      *verbosity,
+		question:       q,
+		promptCacheKey: *cacheKey,
+		timeout:        *timeout,
+		useWebSearch:   *webSearch,
+		showAll:        *showAll,
 	}
 }
 
@@ -196,14 +199,15 @@ func runCLI() {
 
 	ctx := context.Background()
 	apiResp, err := CallAPI(ctx, CallAPIParams{
-		APIKey:       envCfg.APIKey,
-		BaseURL:      args.baseURL,
-		Query:        args.question,
-		Model:        args.model,
-		Effort:       args.effort,
-		Verbosity:    args.verbosity,
-		Timeout:      args.timeout,
-		UseWebSearch: args.useWebSearch,
+		APIKey:         envCfg.APIKey,
+		BaseURL:        args.baseURL,
+		Query:          args.question,
+		Model:          args.model,
+		Effort:         args.effort,
+		Verbosity:      args.verbosity,
+		PromptCacheKey: resolvePromptCacheKey(ctx, args.promptCacheKey),
+		Timeout:        args.timeout,
+		UseWebSearch:   args.useWebSearch,
 	})
 	if err != nil {
 		fail(2, err.Error())

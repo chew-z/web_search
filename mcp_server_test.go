@@ -302,7 +302,7 @@ func TestGptWebsearch_ToolsList_SchemaShape(t *testing.T) {
 			}
 		}
 	}
-	checkEnum("reasoning_effort", []string{"minimal", "low", "medium", "high"})
+	checkEnum("reasoning_effort", []string{"none", "low", "medium", "high", "xhigh"})
 	checkEnum("verbosity", []string{"low", "medium", "high"})
 
 	required, ok := in["required"].([]any)

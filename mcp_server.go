@@ -94,8 +94,8 @@ func newGptWebsearchTool() mcp.Tool {
 		),
 		mcp.WithString("reasoning_effort",
 			mcp.DefaultString(defaultEffort),
-			mcp.Description("Reasoning effort level: minimal (90s), low (3min), medium (5min), or high (10min timeout)"),
-			mcp.Enum("minimal", "low", "medium", "high"),
+			mcp.Description("Reasoning effort level: none (90s), low (3min), medium (5min), high (10min), or xhigh (15min timeout)"),
+			mcp.Enum("none", "low", "medium", "high", "xhigh"),
 		),
 		mcp.WithString("verbosity",
 			mcp.DefaultString(defaultVerbosity),
@@ -105,6 +105,10 @@ func newGptWebsearchTool() mcp.Tool {
 		mcp.WithString("previous_response_id",
 			mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
 		),
+		mcp.WithString("prompt_cache_key",
+			mcp.Description("Optional: OpenAI prompt_cache_key. Requests sharing the same prefix and key "+
+				"reuse the same cache shard. Leave empty to use the server default (per-user when "+
+				"authenticated, otherwise server-wide).")),
 		mcp.WithBoolean("web_search",
 			mcp.DefaultBool(true),
 			mcp.Description("Use web search (default: true)"),
@@ -122,7 +126,7 @@ func newGptWebsearchTool() mcp.Tool {
 func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Log authenticated user when identity is available (HTTP transport).
-		if userID, username, _ := getUserInfo(ctx); userID != "" {
+		if userID, username := getUserInfo(ctx); userID != "" {
 			logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("authenticated user: %s (%s)", username, userID))
 		}
 
@@ -137,6 +141,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		effort := request.GetString("reasoning_effort", defaultEffort)
 		verbosity := request.GetString("verbosity", defaultVerbosity)
 		previousResponseID := request.GetString("previous_response_id", "")
+		promptCacheKey := request.GetString("prompt_cache_key", "")
 		webSearch := request.GetBool("web_search", true)
 
 		// Log the search request
@@ -151,6 +156,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			"reasoning_effort":     effort,
 			"verbosity":            verbosity,
 			"previous_response_id": previousResponseID,
+			"prompt_cache_key":     promptCacheKey,
 			"web_search":           webSearch,
 		}
 
@@ -204,7 +210,7 @@ func modelsHandler() func(context.Context, mcp.ReadResourceRequest) ([]mcp.Resou
 			{
 				Name:              modelNano,
 				Description:       "Simple facts, definitions, quick lookups, basic summaries",
-				RecommendedEffort: "minimal",
+				RecommendedEffort: "none",
 				Timeout:           "90s",
 			},
 			{

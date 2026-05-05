@@ -82,6 +82,9 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 		if reqBody.PreviousResponseID != "test-prev-id" {
 			t.Errorf("expected previous response ID 'test-prev-id', got %s", reqBody.PreviousResponseID)
 		}
+		if reqBody.PromptCacheKey != "test-cache-key" {
+			t.Errorf("expected prompt_cache_key 'test-cache-key', got %s", reqBody.PromptCacheKey)
+		}
 		if len(reqBody.Tools) != 1 || reqBody.Tools[0].Type != "web_search_preview" {
 			t.Errorf("expected web search tool, got %+v", reqBody.Tools)
 		}
@@ -112,6 +115,7 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 		Effort:             "test-effort",
 		Verbosity:          "test-verbosity",
 		PreviousResponseID: "test-prev-id",
+		PromptCacheKey:     "test-cache-key",
 		Timeout:            2 * time.Second,
 		UseWebSearch:       true,
 	})
@@ -440,6 +444,58 @@ func TestExtractAnswer(t *testing.T) {
 			got := ExtractAnswer(tt.apiResp)
 			if got != tt.want {
 				t.Errorf("ExtractAnswer() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolvePromptCacheKey(t *testing.T) {
+	t.Parallel()
+
+	authCtx := context.WithValue(context.Background(), userInfoKey, userInfo{
+		ID:       "user-42",
+		Username: "alice",
+		Role:     "user",
+	})
+
+	tests := []struct {
+		name     string
+		ctx      context.Context
+		supplied string
+		want     string
+	}{
+		{
+			name:     "supplied wins",
+			ctx:      context.Background(),
+			supplied: "caller-key",
+			want:     "caller-key",
+		},
+		{
+			name:     "anon falls back to server name",
+			ctx:      context.Background(),
+			supplied: "",
+			want:     serverName,
+		},
+		{
+			name:     "authenticated user shards by user id",
+			ctx:      authCtx,
+			supplied: "",
+			want:     serverName + ":user-42",
+		},
+		{
+			name:     "supplied still wins over auth identity",
+			ctx:      authCtx,
+			supplied: "caller-key",
+			want:     "caller-key",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := resolvePromptCacheKey(tt.ctx, tt.supplied); got != tt.want {
+				t.Errorf("resolvePromptCacheKey = %q, want %q", got, tt.want)
 			}
 		})
 	}

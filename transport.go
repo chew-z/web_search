@@ -11,7 +11,7 @@ import (
 // HTTP server timeouts to mitigate Slowloris-style DoS attacks.
 const (
 	httpReadTimeout  = 30 * time.Second
-	httpWriteTimeout = 10 * time.Minute // must accommodate the longest web-search (timeoutHigh = 10m)
+	httpWriteTimeout = 15 * time.Minute // must accommodate the longest web-search (timeoutXHigh = 15m)
 	httpIdleTimeout  = 120 * time.Second
 )
 
