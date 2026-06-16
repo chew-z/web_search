@@ -5,6 +5,7 @@ import (
 	json "encoding/json/v2"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -125,15 +126,17 @@ func newGptWebsearchTool() mcp.Tool {
 // (set by the middleware on authenticated HTTP requests).
 func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		start := time.Now()
+
 		// Log authenticated user when identity is available (HTTP transport).
 		if userID, username := getUserInfo(ctx); userID != "" {
-			logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf("authenticated user: %s (%s)", username, userID))
+			logToClient(ctx, mcp.LoggingLevelDebug, "web_search", fmt.Sprintf("authenticated user: %s (%s)", username, userID))
 		}
 
 		// Extract parameters
 		query, err := request.RequireString("query")
 		if err != nil {
-			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("Failed to extract query parameter: %v", err))
+			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("missing query parameter: %v", err))
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
@@ -146,13 +149,9 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 
 		// Log the search request
 		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf(
-			"Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%t'",
+			"request: query='%s', model='%s', effort='%s', verbosity='%s', web_search=%t",
 			query, model, effort, verbosity, webSearch))
 
-		// Call handler with properly extracted values. The defaults (e.g.
-		// web_search=true when omitted) come from the GetString/GetBool calls
-		// above, which is why we build the struct here rather than using
-		// request.BindArguments (a defaults-free JSON round-trip).
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, WebSearchParams{
 			Query:              query,
 			Model:              model,
@@ -163,12 +162,22 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			UseWebSearch:       webSearch,
 		})
 		if err != nil {
-			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("Web search failed: %v", err))
+			duration := time.Since(start)
+			Info("web search failed", "query", query, "model", model, "effort", effort, "duration", duration.String(), "error", err)
+			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("search failed after %s: %v", duration, err))
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		// Log success
-		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", "Web search completed successfully")
+		// Log success with duration and result metadata
+		duration := time.Since(start)
+		answerLen := 0
+		if result != nil {
+			answerLen = len(result.Answer)
+		}
+		Info("web search completed", "query", query, "model", model, "effort", effort, "duration", duration.String(), "answer_chars", answerLen, "web_search", webSearch)
+		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf(
+			"completed: model=%s effort=%s duration=%s answer=%d chars",
+			model, effort, duration, answerLen))
 
 		// Return structured JSON content rather than a JSON string
 		return mcp.NewToolResultStructuredOnly(result), nil

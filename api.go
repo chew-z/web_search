@@ -175,6 +175,7 @@ func resolvePromptCacheKey(ctx context.Context, supplied string) string {
 func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchParams) (*WebSearchResult, error) {
 	if p.Query == "" {
 		errMsg := "Please provide a query to search for"
+		Warn("empty query rejected")
 		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
 		return &WebSearchResult{
 			Success:            false,
@@ -220,6 +221,7 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 	answer := ExtractAnswer(apiResp)
 	if answer == "" {
 		errMsg := "No answer found in response"
+		Warn("no answer in response", "model", model, "effort", effort, "response_id", apiResp.ID)
 		logToClient(ctx, mcp.LoggingLevelWarning, "api_handler", errMsg)
 		return &WebSearchResult{
 			Success:            false,
@@ -234,7 +236,8 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 	}
 
 	// Log successful completion
-	logToClient(ctx, mcp.LoggingLevelDebug, "api_handler", fmt.Sprintf("Search completed successfully, answer length: %d characters", len(answer)))
+	Debug("search completed", "model", apiResp.Model, "effort", apiResp.Reasoning.Effort, "answer_chars", len(answer), "response_id", apiResp.ID)
+	logToClient(ctx, mcp.LoggingLevelDebug, "api_handler", fmt.Sprintf("Search completed: model=%s effort=%s answer=%d chars", apiResp.Model, apiResp.Reasoning.Effort, len(answer)))
 
 	// Return structured response
 	return &WebSearchResult{

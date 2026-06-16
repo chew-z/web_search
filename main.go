@@ -96,20 +96,22 @@ func runMCPMode() {
 	// Create and run MCP server
 	mcpServer := NewMCPServer(cfg)
 
+	logStartup(cfg)
+
 	// Run with appropriate transport
 	switch cfg.Transport {
 	case "stdio":
 		if err := RunStdioTransport(mcpServer); err != nil {
-			Error("STDIO transport error", "error", err)
+			Error("transport failed", "protocol", "stdio", "error", err)
 			os.Exit(1)
 		}
 	case "http":
 		if err := RunHTTPTransport(mcpServer, cfg); err != nil {
-			Error("HTTP transport error", "error", err)
+			Error("transport failed", "protocol", "http", "error", err)
 			os.Exit(1)
 		}
 	default:
-		Error("Unknown transport (use 'stdio' or 'http')", "transport", cfg.Transport)
+		Error("unknown transport", "transport", cfg.Transport)
 		os.Exit(1)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync"
 
 	"github.com/mark3labs/mcp-go/util"
@@ -37,6 +38,25 @@ func setVerbose(verbose bool) {
 	} else {
 		levelVar.Set(slog.LevelInfo)
 	}
+}
+
+// logStartup emits a standardized startup banner with server identity, runtime,
+// and effective configuration. Call once after all config is resolved.
+func logStartup(cfg MCPConfig) {
+	Info("server starting",
+		"name", serverName,
+		"version", serverVersion,
+		"pid", os.Getpid(),
+		"go", runtime.Version(),
+		"gomaxprocs", runtime.GOMAXPROCS(0),
+		"transport", cfg.Transport,
+		"auth_enabled", cfg.AuthEnabled,
+		"heartbeat", cfg.Heartbeat.String(),
+		"verbose", cfg.Verbose,
+		"base_url", cfg.BaseURL,
+		"model_default", defaultModel,
+		"effort_default", defaultEffort,
+	)
 }
 
 // Debug logs at debug level with optional structured key/value pairs.

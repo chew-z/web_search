@@ -17,7 +17,7 @@ const (
 
 // RunStdioTransport runs the MCP server using STDIO transport.
 func RunStdioTransport(mcpServer *server.MCPServer) error {
-	Info("Starting STDIO transport")
+	Info("transport listening", "protocol", "stdio")
 	return server.ServeStdio(mcpServer)
 }
 
@@ -41,7 +41,7 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 	var mcpOpts []server.StreamableHTTPOption
 
 	if cfg.Heartbeat > 0 {
-		Info("HTTP heartbeat enabled", "interval", cfg.Heartbeat)
+		Debug("heartbeat configured", "interval", cfg.Heartbeat)
 		mcpOpts = append(mcpOpts, server.WithHeartbeatInterval(cfg.Heartbeat))
 	}
 
@@ -52,7 +52,7 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 	// Optionally wrap with auth middleware for a real HTTP 401 before MCP init.
 	var handler http.Handler = mcpHandler
 	if cfg.AuthEnabled {
-		Info("HTTP authentication enabled (JWT/HS256)")
+		Info("auth enabled", "method", "JWT/HS256")
 		handler = newAuthHTTPMiddleware([]byte(cfg.AuthSecretKey), mcpHandler)
 	}
 
@@ -60,8 +60,7 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 	mux.Handle("/", handler)
 
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
-	Info("Starting HTTP server", "addr", addr)
-	Info("MCP endpoint", "url", fmt.Sprintf("http://%s/", addr))
+	Info("transport listening", "protocol", "http", "addr", addr, "endpoint", fmt.Sprintf("http://%s/", addr))
 
 	srv := &http.Server{
 		Addr:         addr,
