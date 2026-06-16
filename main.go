@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -18,8 +20,15 @@ func main() {
 		return
 	}
 
-	// Original CLI mode
-	runCLI()
+	// Original CLI mode. main is the single exit point: runCLI returns errors
+	// (so it is unit-testable) and we map them back to the original exit codes.
+	if err := runCLI(); err != nil {
+		var ee *exitError
+		if errors.As(err, &ee) {
+			fail(ee.code, ee.msg)
+		}
+		fail(1, err.Error())
+	}
 }
 
 func runMCPMode() {
@@ -186,15 +195,15 @@ func flagWasSet(name string) bool {
 	return set
 }
 
-func runCLI() {
+func runCLI() error {
 	envCfg, err := loadEnvConfig()
 	if err != nil {
-		fail(2, err.Error())
+		return &exitError{2, err.Error()}
 	}
 
 	args := parseCLIArgs(envCfg)
 	if args.question == "" {
-		fail(2, "please provide a question to ask (use -q flag or positional argument)")
+		return &exitError{2, "please provide a question to ask (use -q flag or positional argument)"}
 	}
 
 	ctx := context.Background()
@@ -210,18 +219,19 @@ func runCLI() {
 		UseWebSearch:   args.useWebSearch,
 	})
 	if err != nil {
-		fail(2, err.Error())
+		return &exitError{2, err.Error()}
 	}
 
 	if args.showAll {
-		raw, _ := json.MarshalIndent(apiResp, "", "  ") //nolint:errcheck // Debug output, error ok to ignore
+		raw, _ := json.Marshal(apiResp, jsontext.WithIndent("  ")) //nolint:errcheck // Debug output, error ok to ignore
 		fmt.Println(string(raw))
-		return
+		return nil
 	}
 
 	answer := ExtractAnswer(apiResp)
 	if answer == "" {
-		fail(3, "no answer found in response")
+		return &exitError{3, "no answer found in response"}
 	}
 	fmt.Println(answer)
+	return nil
 }

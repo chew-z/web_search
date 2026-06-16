@@ -4,11 +4,22 @@ LLM guidance for working with Answer - dual-mode Go application (CLI + MCP serve
 
 ## Build Commands
 
--   `go build -o bin/answer .`
--   `./run_format.sh` - format code
--   `./run_lint.sh` - lint (golangci-lint)
--   `./run_test.sh` - run tests
--   `./test_timeouts.sh` - timeout behavior testing
+**Requires `GOEXPERIMENT=jsonv2`** (Go 1.26): the code imports `encoding/json/v2`
+and `encoding/json/jsontext`, gated behind this experiment. Without it, builds
+fail with `build constraints exclude all Go files in .../encoding/json/v2`. The
+flag is centralized in `Taskfile.yml` (`env:` block) and exported by
+`run_test.sh` / `run_lint.sh`.
+
+-   `task build` - build (preferred; sets the flag) → `bin/answer`
+-   `task test` / `task lint` / `task fmt` - test, lint, format with the flag
+-   `task run -- "query"` - run the CLI
+-   Ad-hoc: `GOEXPERIMENT=jsonv2 go build -o bin/answer .`
+-   `./run_format.sh` - format code (gofmt only; no flag needed)
+-   `./run_lint.sh` / `./run_test.sh` - lint / test (export the flag themselves)
+-   gopls can't read the Taskfile; for editor diagnostics only, optionally
+    `go env -w GOEXPERIMENT=jsonv2` (not needed for repo build/test/lint).
+
+Module path: `github.com/chew-z/web_search` (was `Answer`; `go install` binary is `web_search`).
 
 ## Environment
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"os"
 
@@ -94,13 +94,13 @@ func newGptWebsearchTool() mcp.Tool {
 		),
 		mcp.WithString("reasoning_effort",
 			mcp.DefaultString(defaultEffort),
-			mcp.Description("Reasoning effort level: none (90s), low (3min), medium (5min), high (10min), or xhigh (15min timeout)"),
-			mcp.Enum("none", "low", "medium", "high", "xhigh"),
+			mcp.Description(effortDescription()),
+			mcp.Enum(effortEnumValues()...),
 		),
 		mcp.WithString("verbosity",
 			mcp.DefaultString(defaultVerbosity),
 			mcp.Description("Response verbosity level: low (concise), medium (balanced), or high (detailed with explanations)"),
-			mcp.Enum("low", "medium", "high"),
+			mcp.Enum(verbosityLevels...),
 		),
 		mcp.WithString("previous_response_id",
 			mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
@@ -149,18 +149,19 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			"Executing web search: query='%s', model='%s', effort='%s', verbosity='%s', web_search='%t'",
 			query, model, effort, verbosity, webSearch))
 
-		// Call handler with properly extracted values
-		args := map[string]interface{}{
-			"query":                query,
-			"model":                model,
-			"reasoning_effort":     effort,
-			"verbosity":            verbosity,
-			"previous_response_id": previousResponseID,
-			"prompt_cache_key":     promptCacheKey,
-			"web_search":           webSearch,
-		}
-
-		result, err := HandleWebSearch(ctx, apiKey, baseURL, args)
+		// Call handler with properly extracted values. The defaults (e.g.
+		// web_search=true when omitted) come from the GetString/GetBool calls
+		// above, which is why we build the struct here rather than using
+		// request.BindArguments (a defaults-free JSON round-trip).
+		result, err := HandleWebSearch(ctx, apiKey, baseURL, WebSearchParams{
+			Query:              query,
+			Model:              model,
+			Effort:             effort,
+			Verbosity:          verbosity,
+			PreviousResponseID: previousResponseID,
+			PromptCacheKey:     promptCacheKey,
+			UseWebSearch:       webSearch,
+		})
 		if err != nil {
 			logToClient(ctx, mcp.LoggingLevelError, "web_search", fmt.Sprintf("Web search failed: %v", err))
 			return mcp.NewToolResultError(err.Error()), nil
@@ -206,26 +207,22 @@ func modelsHandler() func(context.Context, mcp.ReadResourceRequest) ([]mcp.Resou
 
 	payload := modelsPayload{
 		Default: modelMini,
-		Models: []modelEntry{
-			{
-				Name:              modelNano,
-				Description:       "Simple facts, definitions, quick lookups, basic summaries",
-				RecommendedEffort: "none",
-				Timeout:           "90s",
-			},
-			{
-				Name:              modelMini,
-				Description:       "Well-defined research tasks, comparisons, specific topics with clear scope",
-				RecommendedEffort: "medium",
-				Timeout:           "5m",
-			},
-			{
-				Name:              modelFull,
-				Description:       "Complex analysis, coding questions, multi-faceted problems, reasoning tasks",
-				RecommendedEffort: "high",
-				Timeout:           "10m",
-			},
-		},
+		Models:  make([]modelEntry, 0, len(modelRegistry)),
+	}
+	for _, m := range modelRegistry {
+		// DisplayTimeout is derived from the effort registry — single source,
+		// zero duplication. The drift-guard test asserts every RecommendedEffort
+		// resolves, so the comma-ok miss path is defensive only.
+		display := ""
+		if e, ok := effortByName(m.RecommendedEffort); ok {
+			display = e.DisplayTimeout
+		}
+		payload.Models = append(payload.Models, modelEntry{
+			Name:              m.Name,
+			Description:       m.Description,
+			RecommendedEffort: m.RecommendedEffort,
+			Timeout:           display,
+		})
 	}
 
 	data, err := json.Marshal(payload)

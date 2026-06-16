@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"net"
@@ -43,6 +43,9 @@ type CallAPIParams struct {
 	PromptCacheKey     string
 	Timeout            time.Duration
 	UseWebSearch       bool
+	// HTTPClient overrides the package-level default client when non-nil.
+	// Enables per-request / test injection without touching the global.
+	HTTPClient *http.Client
 }
 
 // CallAPI makes the actual API call - reusable for both CLI and MCP
@@ -85,7 +88,7 @@ func CallAPI(ctx context.Context, p CallAPIParams) (*apiResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 
-	resp, err := httpClient.Do(req)
+	resp, err := clientOrDefault(p.HTTPClient).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}
@@ -107,6 +110,15 @@ func CallAPI(ctx context.Context, p CallAPIParams) (*apiResponse, error) {
 	}
 
 	return &ar, nil
+}
+
+// clientOrDefault returns the supplied client, or the package-level default
+// when nil. Kept as a helper so CallAPI stays under the gocyclo threshold.
+func clientOrDefault(c *http.Client) *http.Client {
+	if c != nil {
+		return c
+	}
+	return httpClient
 }
 
 // ExtractAnswer extracts the answer text from the API response
@@ -131,51 +143,18 @@ func ExtractAnswer(apiResp *apiResponse) string {
 	return sb.String()
 }
 
-// webSearchArgs holds the validated arguments extracted from a tool-call map.
-type webSearchArgs struct {
-	query              string
-	model              string
-	effort             string
-	verbosity          string
-	previousResponseID string
-	promptCacheKey     string
-	useWebSearch       bool
-}
-
-func extractWebSearchArgs(args map[string]interface{}) webSearchArgs {
-	previousResponseID, _ := args["previous_response_id"].(string) //nolint:errcheck
-
-	query, _ := args["query"].(string) //nolint:errcheck
-
-	model, _ := args["model"].(string) //nolint:errcheck
-	if model == "" {
-		model = defaultModel
-	}
-
-	effort, _ := args["reasoning_effort"].(string) //nolint:errcheck
-	effort = validateEffort(effort)
-
-	verbosity, _ := args["verbosity"].(string) //nolint:errcheck
-	verbosity = validateVerbosity(verbosity)
-
-	promptCacheKey, _ := args["prompt_cache_key"].(string) //nolint:errcheck
-
-	useWebSearch := true
-	if webSearchVal, exists := args["web_search"]; exists {
-		if webSearchBool, ok := webSearchVal.(bool); ok {
-			useWebSearch = webSearchBool
-		}
-	}
-
-	return webSearchArgs{
-		query:              query,
-		model:              model,
-		effort:             effort,
-		verbosity:          verbosity,
-		previousResponseID: previousResponseID,
-		promptCacheKey:     promptCacheKey,
-		useWebSearch:       useWebSearch,
-	}
+// WebSearchParams holds the typed inputs for a web-search request. It is the
+// single, type-safe entry point into HandleWebSearch — no map[string]interface{}
+// plumbing. The MCP handler populates it from the validated tool-call request;
+// other (e.g. future non-MCP) callers can build it directly.
+type WebSearchParams struct {
+	Query              string
+	Model              string
+	Effort             string
+	Verbosity          string
+	PreviousResponseID string
+	PromptCacheKey     string
+	UseWebSearch       bool
 }
 
 // resolvePromptCacheKey picks the prompt_cache_key to send upstream:
@@ -193,23 +172,33 @@ func resolvePromptCacheKey(ctx context.Context, supplied string) string {
 }
 
 // HandleWebSearch handles web search requests for the MCP server
-func HandleWebSearch(ctx context.Context, apiKey, baseURL string, args map[string]interface{}) (*WebSearchResult, error) {
-	wa := extractWebSearchArgs(args)
-	if wa.query == "" {
+func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchParams) (*WebSearchResult, error) {
+	if p.Query == "" {
 		errMsg := "Please provide a query to search for"
 		logToClient(ctx, mcp.LoggingLevelError, "api_handler", errMsg)
 		return &WebSearchResult{
 			Success:            false,
 			Error:              errMsg,
 			WebSearchUsed:      false,
-			PreviousResponseID: wa.previousResponseID,
+			PreviousResponseID: p.PreviousResponseID,
 		}, nil
 	}
 
-	query, model, effort, verbosity := wa.query, wa.model, wa.effort, wa.verbosity
-	previousResponseID, useWebSearch := wa.previousResponseID, wa.useWebSearch
+	// Keep validation defensive even though the MCP enum schema already rejects
+	// bad effort/verbosity: model has no enum, and a future non-MCP caller could
+	// populate WebSearchParams directly. This is the same defense the deleted
+	// extractWebSearchArgs provided.
+	model := p.Model
+	if model == "" {
+		model = defaultModel
+	}
+	effort := validateEffort(p.Effort)
+	verbosity := validateVerbosity(p.Verbosity)
+
+	query := p.Query
+	previousResponseID, useWebSearch := p.PreviousResponseID, p.UseWebSearch
 	timeout := getTimeoutForEffort(effort)
-	cacheKey := resolvePromptCacheKey(ctx, wa.promptCacheKey)
+	cacheKey := resolvePromptCacheKey(ctx, p.PromptCacheKey)
 
 	apiResp, err := CallAPI(ctx, CallAPIParams{
 		APIKey:             apiKey,

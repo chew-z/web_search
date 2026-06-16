@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -429,7 +429,7 @@ func TestGptWebsearch_OutputSchemaValidation_PassesForValidResult(t *testing.T) 
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(respBody)
+		_ = json.MarshalWrite(w, respBody)
 	}))
 	t.Cleanup(upstream.Close)
 
@@ -461,6 +461,65 @@ func TestGptWebsearch_OutputSchemaValidation_PassesForValidResult(t *testing.T) 
 	answer, _ := sc["answer"].(string)
 	if answer == "" {
 		t.Errorf("structuredContent.answer is empty")
+	}
+}
+
+// TestGptWebsearch_OmittedWebSearch_DefaultsTrue is the regression guard for the
+// deliberate "no request.BindArguments" decision: the handler's GetBool default
+// must keep web_search=true when the caller omits it. If someone swaps the
+// struct population for BindArguments (a defaults-free JSON round-trip), the
+// field silently becomes false — this test catches that both upstream (the
+// web_search_preview tool is sent) and in the structured output.
+func TestGptWebsearch_OmittedWebSearch_DefaultsTrue(t *testing.T) {
+	t.Parallel()
+
+	var sawTool atomic.Bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reqBody requestBody
+		_ = json.UnmarshalRead(r.Body, &reqBody)
+		if len(reqBody.Tools) == 1 && reqBody.Tools[0].Type == "web_search_preview" {
+			sawTool.Store(true)
+		}
+		respBody := map[string]any{
+			"id":        "resp_default_ws",
+			"model":     modelMini,
+			"reasoning": map[string]any{"effort": "medium"},
+			"output": []any{
+				map[string]any{
+					"type":    "message",
+					"content": []any{map[string]any{"type": "output_text", "text": "ok"}},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.MarshalWrite(w, respBody)
+	}))
+	t.Cleanup(upstream.Close)
+
+	handler := newStatelessMCPHandler(t, upstream.URL)
+	srv, baseURL := newHTTPServerFromHandler(t, handler)
+	_ = srv
+
+	// web_search deliberately omitted from arguments.
+	resp := jsonrpcCall(t, baseURL+"/", "tools/call", 1, map[string]any{
+		"name": "gpt_websearch",
+		"arguments": map[string]any{
+			"query": "anything",
+		},
+	})
+	res := jsonrpcResult(t, resp)
+	if isErr, _ := res["isError"].(bool); isErr {
+		t.Fatalf("unexpected isError=true: %v", res)
+	}
+	sc, ok := res["structuredContent"].(map[string]any)
+	if !ok {
+		t.Fatalf("structuredContent missing: %v", res)
+	}
+	if used, _ := sc["web_search_used"].(bool); !used {
+		t.Errorf("web_search_used: got %v, want true (omitted should default true)", sc["web_search_used"])
+	}
+	if !sawTool.Load() {
+		t.Errorf("upstream did not receive web_search_preview tool; web_search defaulted false")
 	}
 }
 

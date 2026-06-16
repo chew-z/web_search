@@ -134,48 +134,37 @@ func loadEnvConfig() (EnvConfig, error) {
 	return cfg, nil
 }
 
-// getTimeoutForEffort returns the appropriate timeout based on reasoning effort level
+// getTimeoutForEffort returns the appropriate timeout based on reasoning effort
+// level, derived from effortRegistry. Note the deliberate asymmetry with
+// validateEffort: an unknown/empty effort falls back to the "low" timeout here,
+// whereas validateEffort falls back to defaultEffort ("medium"). Both behaviors
+// are locked in by config_test.go.
 func getTimeoutForEffort(effort string) time.Duration {
-	switch effort {
-	case "xhigh":
-		return timeoutXHigh
-	case "high":
-		return timeoutHigh
-	case "medium":
-		return timeoutMedium
-	case "low", "":
-		return timeoutLow
-	case "none":
-		return timeoutNone
-	default:
-		return timeoutLow
+	if e, ok := effortByName(effort); ok {
+		return e.Timeout
 	}
+	return timeoutLow
 }
 
 // validateEffort ensures the effort level is valid for the gpt-5.4-* / gpt-5.5
 // family this server targets. The legacy "minimal" value (4o/4.1 only) is no
-// longer accepted.
+// longer accepted. Valid values come from effortRegistry; anything else
+// (including empty) falls back to defaultEffort.
 func validateEffort(effort string) string {
-	switch effort {
-	case "none", "low", "medium", "high", "xhigh":
+	if _, ok := effortByName(effort); ok {
 		return effort
-	case "":
-		return defaultEffort
-	default:
-		return defaultEffort
 	}
+	return defaultEffort
 }
 
-// validateVerbosity ensures the verbosity level is valid
+// validateVerbosity ensures the verbosity level is valid, per verbosityLevels.
 func validateVerbosity(verbosity string) string {
-	switch verbosity {
-	case "low", "medium", "high":
-		return verbosity
-	case "":
-		return defaultVerbosity
-	default:
-		return defaultVerbosity
+	for _, v := range verbosityLevels {
+		if v == verbosity {
+			return verbosity
+		}
 	}
+	return defaultVerbosity
 }
 
 // MCPConfigParams holds the raw input values for building an MCPConfig.

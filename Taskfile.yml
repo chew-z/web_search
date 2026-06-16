@@ -1,0 +1,56 @@
+# Taskfile for github.com/chew-z/web_search
+#
+# Centralizes GOEXPERIMENT=jsonv2 in one env block so every go command run
+# through `task` builds the encoding/json/v2 + encoding/json/jsontext imports.
+#
+# IMPORTANT: this env only applies to commands `task` runs. It does NOT reach
+# your editor / gopls (which will flag json/v2 imports as build errors) nor
+# `go install github.com/chew-z/web_search@latest` for external users. See
+# README "JSON v2 / Go toolchain" for the optional per-developer workaround.
+#
+# Requires: go-task (https://taskfile.dev), task v3+.
+version: "3"
+
+env:
+  GOEXPERIMENT: jsonv2
+
+vars:
+  BIN: bin/answer
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build the answer binary
+    cmds:
+      - go build -o {{.BIN}} .
+
+  test:
+    desc: Run the test suite
+    cmds:
+      - go test ./...
+
+  lint:
+    desc: Run golangci-lint (with --fix)
+    cmds:
+      - golangci-lint run --fix ./...
+
+  fmt:
+    desc: Format all Go files
+    cmds:
+      - gofmt -w .
+
+  run:
+    desc: 'Run the CLI (pass args after --, e.g. `task run -- "your query"`)'
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  release:
+    desc: Build a release binary for github.com/chew-z/web_search
+    cmds:
+      - go build -o {{.BIN}} .
+      - 'echo "Built {{.BIN}} for github.com/chew-z/web_search"'

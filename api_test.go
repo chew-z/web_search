@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"net"
 	"net/http"
@@ -31,12 +31,14 @@ func withEnv(t *testing.T, env map[string]string) {
 	}
 }
 
-// Helper: JSON write utility for handlers.
+// Helper: JSON write utility for handlers. json/v2 MarshalWrite does not append
+// a trailing newline (unlike v1's Encoder.Encode), so the error-body assertions
+// below compare against newline-free expectations.
 func writeJSON(t *testing.T, w http.ResponseWriter, status int, body any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	_ = json.MarshalWrite(w, body)
 }
 
 func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
@@ -63,7 +65,7 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 
 		// Verify request body
 		var reqBody requestBody
-		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		if err := json.UnmarshalRead(r.Body, &reqBody); err != nil {
 			http.Error(w, "failed to decode request body", http.StatusBadRequest)
 			return
 		}
@@ -152,7 +154,7 @@ func TestCallAPI_Success_WebSearchFalse_OmitsTools(t *testing.T) {
 		}
 
 		var reqBody requestBody
-		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		if err := json.UnmarshalRead(r.Body, &reqBody); err != nil {
 			http.Error(w, "failed to decode request body", http.StatusBadRequest)
 			return
 		}
@@ -240,9 +242,9 @@ func TestCallAPI_Non2xxErrors_401_403_429(t *testing.T) {
 	}
 
 	cases := []tc{
-		{name: "401_unauthorized", status: http.StatusUnauthorized, respBody: map[string]string{"error": "unauthorized"}, expectBody: "{\"error\":\"unauthorized\"}\n"},
-		{name: "403_forbidden", status: http.StatusForbidden, respBody: map[string]string{"error": "forbidden"}, expectBody: "{\"error\":\"forbidden\"}\n"},
-		{name: "429_ratelimit", status: http.StatusTooManyRequests, respBody: map[string]string{"error": "too many requests"}, expectBody: "{\"error\":\"too many requests\"}\n"},
+		{name: "401_unauthorized", status: http.StatusUnauthorized, respBody: map[string]string{"error": "unauthorized"}, expectBody: "{\"error\":\"unauthorized\"}"},
+		{name: "403_forbidden", status: http.StatusForbidden, respBody: map[string]string{"error": "forbidden"}, expectBody: "{\"error\":\"forbidden\"}"},
+		{name: "429_ratelimit", status: http.StatusTooManyRequests, respBody: map[string]string{"error": "too many requests"}, expectBody: "{\"error\":\"too many requests\"}"},
 	}
 
 	for _, c := range cases {

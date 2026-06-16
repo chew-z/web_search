@@ -16,24 +16,51 @@ A Go application that provides intelligent web search capabilities using OpenAI'
 
 ### Prerequisites
 
--   Go 1.25.0 or later
+-   Go 1.26.0 or later
 -   OpenAI API key with web search preview access
+
+### JSON v2 / Go toolchain
+
+This project uses `encoding/json/v2` + `encoding/json/jsontext`, which on Go 1.26
+are gated behind a build experiment. **Every `go` command must run with
+`GOEXPERIMENT=jsonv2`** or the build fails with
+`build constraints exclude all Go files in .../encoding/json/v2`.
+
+The flag is centralized in `Taskfile.yml` (an `env:` block), so the recommended
+workflow is to use [go-task](https://taskfile.dev):
+
+```bash
+task build   # go build with GOEXPERIMENT=jsonv2
+task test
+task lint
+task fmt
+```
+
+The `run_*.sh` scripts also export the flag. For ad-hoc commands, prefix them:
+`GOEXPERIMENT=jsonv2 go test ./...`.
+
+> **Editor / gopls note:** gopls cannot read the Taskfile env, so it will report
+> json/v2 imports as build errors. Optional per-developer fix (persistent,
+> machine-wide): `go env -w GOEXPERIMENT=jsonv2`. This is **not** required for
+> repo build/test/lint (those go through `task`); it only affects in-editor
+> diagnostics.
 
 ### Build from Source
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd Answer
+git clone https://github.com/chew-z/web_search
+cd web_search
 
 # Install dependencies
 go mod download
 
-# Build the binary
-go build -o bin/answer .
+# Build the binary (flag required — see "JSON v2 / Go toolchain" above)
+task build
+# …or: GOEXPERIMENT=jsonv2 go build -o bin/answer .
 
-# Or install globally
-go install .
+# Or install globally (external users must also enable the experiment):
+GOEXPERIMENT=jsonv2 go install github.com/chew-z/web_search@latest
 ```
 
 ## Configuration
