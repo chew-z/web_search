@@ -4,6 +4,7 @@ import (
 	"context"
 	json "encoding/json/v2"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -501,4 +502,194 @@ func TestResolvePromptCacheKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleWebSearch_EmptyQuery(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_API_KEY": "test-key"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
+		Query: "",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.Success {
+		t.Fatalf("expected success=false, got true")
+	}
+	if result.Error != "Please provide a query to search for" {
+		t.Fatalf("expected error 'Please provide a query to search for', got %q", result.Error)
+	}
+}
+
+func TestHandleWebSearch_APIError(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_API_KEY": "test-key"})
+
+	withMockHTTPClient(t, roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body: io.NopCloser(strings.NewReader(`{"error":"upstream failure"}`)),
+			Header: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			Request: r,
+		}, nil
+	}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
+		Query: "test query",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if result != nil {
+		t.Fatalf("expected nil result on API error, got %#v", result)
+	}
+}
+
+func TestHandleWebSearch_EmptyAnswer(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_API_KEY": "test-key"})
+
+	withMockHTTPClient(t, roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		_ = r
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(`{"id":"resp-id","model":"resp-model","reasoning":{"effort":"low"},"output":[]}`)),
+			Header: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			Request: r,
+		}, nil
+	}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
+		Query: "test query",
+		Model: "gpt-5.4-mini",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.Success {
+		t.Fatalf("expected success=false, got true")
+	}
+	if result.Error != "No answer found in response" {
+		t.Fatalf("expected error 'No answer found in response', got %q", result.Error)
+	}
+}
+
+func TestHandleWebSearch_Success(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_API_KEY": "test-key"})
+
+	withMockHTTPClient(t, roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		_ = r
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(`{"id":"response-id-123","model":"resp-model","reasoning":{"effort":"high"},"output":[{"type":"message","content":[{"type":"output_text","text":"Here is your answer."}]}]}`)),
+			Header: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			Request: r,
+		}, nil
+	}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
+		Query:              "test query",
+		Model:              "gpt-5.4-mini",
+		Effort:             "high",
+		Verbosity:          "high",
+		PreviousResponseID: "prev-id",
+		PromptCacheKey:     "prompt-cache",
+		UseWebSearch:       true,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if !result.Success {
+		t.Fatalf("expected success=true, got false: %+v", result)
+	}
+	if result.Answer == "" {
+		t.Fatal("expected non-empty answer")
+	}
+	if result.Model == "" {
+		t.Fatal("expected model to be populated")
+	}
+	if result.Effort == "" {
+		t.Fatal("expected effort to be populated")
+	}
+	if result.ID == "" {
+		t.Fatal("expected id to be populated")
+	}
+}
+
+func TestHandleWebSearch_DefaultModel(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_API_KEY": "test-key"})
+
+	var gotModel string
+	withMockHTTPClient(t, roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		var req requestBody
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
+			t.Fatalf("failed to unmarshal request body: %v", err)
+			return nil, err
+		}
+		gotModel = req.Model
+
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(`{"id":"resp-id","model":"resp-model","reasoning":{"effort":"medium"},"output":[{"type":"message","content":[{"type":"output_text","text":"Answer"}]}]}`)),
+			Header: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			Request: r,
+		}, nil
+	}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
+		Query: "test query",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if gotModel != defaultModel {
+		t.Fatalf("expected model %q, got %q", defaultModel, gotModel)
+	}
+}
+func withMockHTTPClient(t *testing.T, rt http.RoundTripper) {
+	t.Helper()
+
+	orig := httpClient
+	httpClient = &http.Client{
+		Transport: rt,
+	}
+	t.Cleanup(func() {
+		httpClient = orig
+	})
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return fn(r)
 }

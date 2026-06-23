@@ -164,19 +164,34 @@ func jsonrpcCall(t *testing.T, url, method string, id int, params any) map[strin
 
 	payload := raw
 	if ct := resp.Header.Get("Content-Type"); strings.Contains(ct, "text/event-stream") {
-		// Pull the first `data:` line out of the SSE stream.
-		var found []byte
+		// Collect all `data:` frames from the SSE stream.
+		var frames [][]byte
 		for _, line := range bytes.Split(raw, []byte("\n")) {
 			line = bytes.TrimRight(line, "\r")
 			if bytes.HasPrefix(line, []byte("data:")) {
-				found = bytes.TrimSpace(line[len("data:"):])
-				break
+				frames = append(frames, bytes.TrimSpace(line[len("data:"):]))
 			}
 		}
-		if found == nil {
+		if len(frames) == 0 {
 			t.Fatalf("no SSE data frame in response: %s", raw)
 		}
-		payload = found
+		// Pick the frame that carries a JSON-RPC response (has an "id" field),
+		// skipping server-initiated notifications (e.g. logging/message).
+		var chosen []byte
+		for _, f := range frames {
+			var probe map[string]any
+			if err := json.Unmarshal(f, &probe); err == nil {
+				if _, hasID := probe["id"]; hasID {
+					chosen = f
+					break
+				}
+			}
+		}
+		if chosen == nil {
+			// Fall back to the first frame if no response frame found.
+			chosen = frames[0]
+		}
+		payload = chosen
 	}
 
 	var out map[string]any
@@ -569,5 +584,181 @@ func TestMCPServer_HTTP_ProxiedPaths(t *testing.T) {
 				t.Fatalf("POST %s: got %d, want 200, body: %s", tt.path, resp.StatusCode, body)
 			}
 		})
+	}
+}
+
+func TestMCPServer_ServerInfoResource(t *testing.T) {
+	t.Parallel()
+
+	handler := newStatelessMCPHandler(t, defaultBaseURL)
+	srv, baseURL := newHTTPServerFromHandler(t, handler)
+	_ = srv
+
+	resp := jsonrpcCall(t, baseURL+"/", "resources/read", 1, map[string]any{
+		"uri": "server://info",
+	})
+	res := jsonrpcResult(t, resp)
+
+	contents, ok := res["contents"].([]any)
+	if !ok || len(contents) == 0 {
+		t.Fatalf("resources/read result.contents invalid: %v", res)
+	}
+	content, ok := contents[0].(map[string]any)
+	if !ok {
+		t.Fatalf("resource content is not object: %v", contents[0])
+	}
+	text, ok := content["text"].(string)
+	if !ok {
+		t.Fatalf("resource content text missing: %v", content)
+	}
+
+	if !strings.Contains(text, "GPT Web Search MCP Server") {
+		t.Fatalf("server info text does not contain title: %q", text)
+	}
+	if !strings.Contains(text, serverVersion) {
+		t.Fatalf("server info text does not contain version %q: %q", serverVersion, text)
+	}
+}
+
+func TestMCPServer_ModelsListResource(t *testing.T) {
+	t.Parallel()
+
+	handler := newStatelessMCPHandler(t, defaultBaseURL)
+	srv, baseURL := newHTTPServerFromHandler(t, handler)
+	_ = srv
+
+	resp := jsonrpcCall(t, baseURL+"/", "resources/read", 1, map[string]any{
+		"uri": "models://list",
+	})
+	res := jsonrpcResult(t, resp)
+
+	contents, ok := res["contents"].([]any)
+	if !ok || len(contents) == 0 {
+		t.Fatalf("resources/read result.contents invalid: %v", res)
+	}
+	content, ok := contents[0].(map[string]any)
+	if !ok {
+		t.Fatalf("resource content is not object: %v", contents[0])
+	}
+	text, ok := content["text"].(string)
+	if !ok {
+		t.Fatalf("resource content text missing: %v", content)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(text), &payload); err != nil {
+		t.Fatalf("models resource payload is not valid JSON: %v; text=%q", err, text)
+	}
+
+	defaultModelValue, ok := payload["default"].(string)
+	if !ok || defaultModelValue == "" {
+		t.Fatalf("models payload missing default string: %v", payload["default"])
+	}
+
+	modelsRaw, ok := payload["models"].([]any)
+	if !ok {
+		t.Fatalf("models payload missing models array: %v", payload["models"])
+	}
+	if len(modelsRaw) != 3 {
+		t.Fatalf("models payload should include 3 models, got %d: %v", len(modelsRaw), modelsRaw)
+	}
+
+	requireFields := []string{"name", "description", "recommended_effort", "timeout"}
+	names := map[string]struct{}{
+		modelNano: {},
+		modelMini: {},
+		modelFull: {},
+	}
+	seen := make(map[string]struct{}, len(modelsRaw))
+	for _, raw := range modelsRaw {
+		model, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("model entry is not object: %T %v", raw, raw)
+		}
+		for _, field := range requireFields {
+			if _, ok := model[field].(string); !ok {
+				t.Fatalf("model entry missing string field %q: %v", field, model)
+			}
+		}
+		name, _ := model["name"].(string)
+		if name == "" {
+			t.Fatalf("model entry name is empty: %v", model)
+		}
+		seen[name] = struct{}{}
+	}
+	for expected := range names {
+		if _, ok := seen[expected]; !ok {
+			t.Fatalf("models payload missing expected model %q: %v", expected, seen)
+		}
+	}
+}
+
+func TestMCPServer_WebSearchPrompt(t *testing.T) {
+	t.Parallel()
+
+	handler := newStatelessMCPHandler(t, defaultBaseURL)
+	srv, baseURL := newHTTPServerFromHandler(t, handler)
+	_ = srv
+
+	question := "What is AI?"
+	resp := jsonrpcCall(t, baseURL+"/", "prompts/get", 1, map[string]any{
+		"name":      "web_search",
+		"arguments": map[string]any{"user_question": question},
+	})
+	res := jsonrpcResult(t, resp)
+
+	messagesRaw, ok := res["messages"].([]any)
+	if !ok || len(messagesRaw) == 0 {
+		t.Fatalf("prompts/get result.messages invalid: %v", res)
+	}
+	msg, ok := messagesRaw[0].(map[string]any)
+	if !ok {
+		t.Fatalf("prompt message is not object: %v", messagesRaw[0])
+	}
+	if got := msg["role"]; got != "user" {
+		t.Fatalf("prompt message role = %v, want user", got)
+	}
+
+	var promptText string
+	switch c := msg["content"].(type) {
+	case map[string]any:
+		switch t := c["text"].(type) {
+		case string:
+			promptText = t
+		case []any:
+			parts := make([]string, 0, len(t))
+			for _, p := range t {
+				if part, ok := p.(string); ok {
+					parts = append(parts, part)
+				}
+			}
+			promptText = strings.Join(parts, "")
+		}
+	case string:
+		promptText = c
+	default:
+		promptText = ""
+	}
+	if promptText == "" {
+		t.Fatalf("prompt message content not string/text: %v", msg["content"])
+	}
+	if !strings.Contains(promptText, question) {
+		t.Fatalf("prompt message text does not contain question %q: %q", question, promptText)
+	}
+}
+
+func TestMCPServer_WebSearchPrompt_MissingArgument(t *testing.T) {
+	t.Parallel()
+
+	handler := newStatelessMCPHandler(t, defaultBaseURL)
+	srv, baseURL := newHTTPServerFromHandler(t, handler)
+	_ = srv
+
+	resp := jsonrpcCall(t, baseURL+"/", "prompts/get", 1, map[string]any{
+		"name":      "web_search",
+		"arguments": map[string]any{},
+	})
+	if errRaw, ok := resp["error"]; !ok || errRaw == nil {
+		t.Fatalf("expected jsonrpc error for missing user_question, got: %v", resp)
 	}
 }
