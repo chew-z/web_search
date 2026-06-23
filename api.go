@@ -185,10 +185,6 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 		}, nil
 	}
 
-	// Keep validation defensive even though the MCP enum schema already rejects
-	// bad effort/verbosity: model has no enum, and a future non-MCP caller could
-	// populate WebSearchParams directly. This is the same defense the deleted
-	// extractWebSearchArgs provided.
 	model := p.Model
 	if model == "" {
 		model = defaultModel
@@ -217,7 +213,6 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 		return nil, err
 	}
 
-	// Extract answer from response
 	answer := ExtractAnswer(apiResp)
 	if answer == "" {
 		errMsg := "No answer found in response"
@@ -235,11 +230,11 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 		}, nil
 	}
 
-	// Log successful completion
 	Debug("search completed", "model", apiResp.Model, "effort", apiResp.Reasoning.Effort, "answer_chars", len(answer), "response_id", apiResp.ID)
-	logToClient(ctx, mcp.LoggingLevelDebug, "api_handler", fmt.Sprintf("Search completed: model=%s effort=%s answer=%d chars", apiResp.Model, apiResp.Reasoning.Effort, len(answer)))
+	logToClient(ctx, mcp.LoggingLevelDebug, "api_handler",
+		fmt.Sprintf("Search completed: model=%s effort=%s answer=%d chars",
+			apiResp.Model, apiResp.Reasoning.Effort, len(answer)))
 
-	// Return structured response
 	return &WebSearchResult{
 		Success:            true,
 		Answer:             answer,

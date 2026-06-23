@@ -174,7 +174,15 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 		if result != nil {
 			answerLen = len(result.Answer)
 		}
-		Info("web search completed", "query", query, "model", model, "effort", effort, "duration", duration.String(), "answer_chars", answerLen, "web_search", webSearch)
+		Info(
+			"web search completed",
+			"query", query,
+			"model", model,
+			"effort", effort,
+			"duration", duration.String(),
+			"answer_chars", answerLen,
+			"web_search", webSearch,
+		)
 		logToClient(ctx, mcp.LoggingLevelInfo, "web_search", fmt.Sprintf(
 			"completed: model=%s effort=%s duration=%s answer=%d chars",
 			model, effort, duration, answerLen))
