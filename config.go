@@ -93,15 +93,27 @@ type EnvConfig struct {
 
 // MCPConfig holds configuration for the MCP server
 type MCPConfig struct {
-	APIKey        string
-	BaseURL       string
-	Transport     string
-	Port          string
-	Host          string
-	Verbose       bool
-	AuthEnabled   bool
-	AuthSecretKey string
-	Heartbeat     time.Duration
+	APIKey                     string
+	BaseURL                    string
+	Transport                  string
+	Port                       string
+	Host                       string
+	Verbose                    bool
+	AuthEnabled                bool
+	AuthSecretKey              string
+	Heartbeat                  time.Duration
+	DisableLocalhostProtection bool
+}
+
+// parseEnvBool reads a boolean environment variable with a fallback default.
+// If the variable is unset or unparseable, defaultVal is returned.
+func parseEnvBool(key string, defaultVal bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return defaultVal
 }
 
 // loadEnvConfig reads environment variables
@@ -171,15 +183,16 @@ func validateVerbosity(verbosity string) string {
 // Using a struct avoids a long positional parameter list and makes call sites
 // readable without per-argument comments.
 type MCPConfigParams struct {
-	APIKey        string
-	BaseURL       string
-	Transport     string
-	Port          string
-	Host          string
-	Verbose       bool
-	AuthEnabled   bool
-	AuthSecretKey string
-	Heartbeat     time.Duration
+	APIKey                     string
+	BaseURL                    string
+	Transport                  string
+	Port                       string
+	Host                       string
+	Verbose                    bool
+	AuthEnabled                bool
+	AuthSecretKey              string
+	Heartbeat                  time.Duration
+	DisableLocalhostProtection bool
 }
 
 // parseMCPConfig creates MCPConfig from the supplied parameters, applying
@@ -200,14 +213,15 @@ func parseMCPConfig(p MCPConfigParams) MCPConfig {
 	}
 
 	return MCPConfig{
-		APIKey:        p.APIKey,
-		BaseURL:       p.BaseURL,
-		Transport:     p.Transport,
-		Port:          p.Port,
-		Host:          p.Host,
-		Verbose:       p.Verbose,
-		AuthEnabled:   p.AuthEnabled,
-		AuthSecretKey: p.AuthSecretKey,
-		Heartbeat:     p.Heartbeat,
+		APIKey:                     p.APIKey,
+		BaseURL:                    p.BaseURL,
+		Transport:                  p.Transport,
+		Port:                       p.Port,
+		Host:                       p.Host,
+		Verbose:                    p.Verbose,
+		AuthEnabled:                p.AuthEnabled,
+		AuthSecretKey:              p.AuthSecretKey,
+		Heartbeat:                  p.Heartbeat,
+		DisableLocalhostProtection: p.DisableLocalhostProtection,
 	}
 }

@@ -80,17 +80,22 @@ func runMCPMode() {
 		os.Exit(1)
 	}
 
+	// DNS rebinding protection: disabled by default since production deployments
+	// run behind nginx. Set ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION=false to enable.
+	disableLocalhostProtection := parseEnvBool("ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION", true)
+
 	// Create server configuration using the config helper
 	cfg := parseMCPConfig(MCPConfigParams{
-		APIKey:        envCfg.APIKey,
-		BaseURL:       *baseURL,
-		Transport:     *transport,
-		Port:          *port,
-		Host:          *host,
-		Verbose:       *verbose,
-		AuthEnabled:   *authEnabled,
-		AuthSecretKey: authSecretKey,
-		Heartbeat:     *heartbeat,
+		APIKey:                     envCfg.APIKey,
+		BaseURL:                    *baseURL,
+		Transport:                  *transport,
+		Port:                       *port,
+		Host:                       *host,
+		Verbose:                    *verbose,
+		AuthEnabled:                *authEnabled,
+		AuthSecretKey:              authSecretKey,
+		Heartbeat:                  *heartbeat,
+		DisableLocalhostProtection: disableLocalhostProtection,
 	})
 
 	// Create and run MCP server

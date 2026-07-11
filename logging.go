@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"runtime"
 	"sync"
-
-	"github.com/mark3labs/mcp-go/util"
 )
 
 // Centralized structured logger using slog with dynamic level control.
@@ -56,6 +53,7 @@ func logStartup(cfg MCPConfig) {
 		"base_url", cfg.BaseURL,
 		"model_default", defaultModel,
 		"effort_default", defaultEffort,
+		"disable_localhost_protection", cfg.DisableLocalhostProtection,
 	)
 }
 
@@ -90,12 +88,9 @@ func ensureLogger() {
 	}
 }
 
-// mcpLogAdapter bridges mcp-go's util.Logger interface to our slog setup.
-type mcpLogAdapter struct{}
-
-func (mcpLogAdapter) Infof(format string, v ...any)  { Info(fmt.Sprintf(format, v...)) }
-func (mcpLogAdapter) Errorf(format string, v ...any) { Error(fmt.Sprintf(format, v...)) }
-
-var _ util.Logger = mcpLogAdapter{}
-
-func mcpGoLogger() util.Logger { return mcpLogAdapter{} }
+// SLogger returns the underlying *slog.Logger for direct use with libraries
+// that accept a standard slog.Logger (e.g. mcp-go v0.56+ WithStreamableHTTPLogger).
+func SLogger() *slog.Logger {
+	ensureLogger()
+	return logger
+}

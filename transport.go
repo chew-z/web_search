@@ -45,7 +45,15 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 		mcpOpts = append(mcpOpts, server.WithHeartbeatInterval(cfg.Heartbeat))
 	}
 
-	mcpOpts = append(mcpOpts, server.WithLogger(mcpGoLogger()))
+	// Disable DNS rebinding protection — the server runs on remote hosts
+	// behind reverse proxies, not on localhost. Controlled by config;
+	// defaults to true (protection off) since production deployments
+	// always sit behind nginx.
+	if cfg.DisableLocalhostProtection {
+		mcpOpts = append(mcpOpts, server.WithDisableLocalhostProtection(true))
+	}
+
+	mcpOpts = append(mcpOpts, server.WithStreamableHTTPLogger(SLogger()))
 
 	mcpHandler := server.NewStreamableHTTPServer(mcpServer, mcpOpts...)
 

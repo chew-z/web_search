@@ -24,7 +24,9 @@ Module path: `github.com/chew-z/web_search` (was `Answer`; `go install` binary i
 ## Environment
 
 Required: `OPENAI_API_KEY`
-Optional: `MODEL`, `EFFORT`, `SHOW_ALL`, `TIMEOUT`, `QUESTION`
+Optional: `MODEL`, `EFFORT`, `SHOW_ALL`, `TIMEOUT`, `QUESTION`,
+`ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` (default `true` — disables mcp-go's
+DNS rebinding protection; set `false` only for local-only dev without a reverse proxy)
 Uses godotenv for `.env` loading
 
 ## Architecture
@@ -122,5 +124,7 @@ Uses godotenv for `.env` loading
 
 ## Dependencies
 
--   `github.com/mark3labs/mcp-go` v0.37.0 - MCP protocol
+-   `github.com/mark3labs/mcp-go` v0.56.0 - MCP protocol (v0.56 added DNS
+    rebinding protection on streamable HTTP; disabled by default via
+    `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION=true` for reverse-proxy deployments)
 -   `github.com/joho/godotenv` v1.5.1 - environment loading

@@ -533,7 +533,7 @@ func TestHandleWebSearch_APIError(t *testing.T) {
 	withMockHTTPClient(t, roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusInternalServerError,
-			Body: io.NopCloser(strings.NewReader(`{"error":"upstream failure"}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"error":"upstream failure"}`)),
 			Header: map[string][]string{
 				"Content-Type": {"application/json"},
 			},
@@ -562,7 +562,7 @@ func TestHandleWebSearch_EmptyAnswer(t *testing.T) {
 		_ = r
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body: io.NopCloser(strings.NewReader(`{"id":"resp-id","model":"resp-model","reasoning":{"effort":"low"},"output":[]}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"resp-id","model":"resp-model","reasoning":{"effort":"low"},"output":[]}`)),
 			Header: map[string][]string{
 				"Content-Type": {"application/json"},
 			},
@@ -598,7 +598,7 @@ func TestHandleWebSearch_Success(t *testing.T) {
 		_ = r
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body: io.NopCloser(strings.NewReader(`{"id":"response-id-123","model":"resp-model","reasoning":{"effort":"high"},"output":[{"type":"message","content":[{"type":"output_text","text":"Here is your answer."}]}]}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"response-id-123","model":"resp-model","reasoning":{"effort":"high"},"output":[{"type":"message","content":[{"type":"output_text","text":"Here is your answer."}]}]}`)),
 			Header: map[string][]string{
 				"Content-Type": {"application/json"},
 			},
@@ -655,7 +655,7 @@ func TestHandleWebSearch_DefaultModel(t *testing.T) {
 
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body: io.NopCloser(strings.NewReader(`{"id":"resp-id","model":"resp-model","reasoning":{"effort":"medium"},"output":[{"type":"message","content":[{"type":"output_text","text":"Answer"}]}]}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"id":"resp-id","model":"resp-model","reasoning":{"effort":"medium"},"output":[{"type":"message","content":[{"type":"output_text","text":"Answer"}]}]}`)),
 			Header: map[string][]string{
 				"Content-Type": {"application/json"},
 			},
