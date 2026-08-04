@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-LLM guidance for working with Answer - dual-mode Go application (CLI + MCP server) for OpenAI web search.
+LLM guidance for working with Answer - dual-mode Go application (CLI + MCP server) for web search via OpenAI and DeepSeek Responses APIs.
 
 ## Build Commands
 
@@ -23,7 +23,10 @@ Module path: `github.com/chew-z/web_search` (was `Answer`; `go install` binary i
 
 ## Environment
 
-Required: `OPENAI_API_KEY`
+Provider selection: `PROVIDER` (`openai` default, `deepseek`); `-provider` flag
+overrides the env var in both CLI and MCP modes.
+
+Required: `OPENAI_API_KEY` (provider `openai`) or `DEEPSEEK_API_KEY` (provider `deepseek`)
 Optional: `MODEL`, `EFFORT`, `SHOW_ALL`, `TIMEOUT`, `QUESTION`,
 `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` (default `true` — disables mcp-go's
 DNS rebinding protection; set `false` only for local-only dev without a reverse proxy)
@@ -39,13 +42,17 @@ Uses godotenv for `.env` loading
 **Key files**:
 
 -   `main.go` - entry point, mode routing
--   `mcp_server.go` - MCP server implementation (commit b6c3478 enhanced prompts)
--   `api.go` - OpenAI API integration
+-   `mcp_server.go` - MCP server implementation (provider-aware tool schema, models resource, prompts)
+-   `api.go` - Responses API integration (provider-specific tool type; narration stripping in `ExtractAnswer`)
+-   `provider.go` - provider registry: endpoint, key env, tool type, model list, prompt per backend
 -   `config.go` - environment config, timeouts
+-   `models.go` - effort/model registries
+-   `prompts.go` - per-provider MCP guidance prompts
 -   `transport.go` - stdio/HTTP transports
+-   `logging.go` - structured slog logging, startup banner
 -   `errors.go` - error handling
 
-## Recent Changes (commit b6c3478)
+## Historical Notes (commit b6c3478, pre-provider era)
 
 **Enhanced MCP Prompt System**: Replaced basic `web_search` with `intelligent_web_search`
 
@@ -69,19 +76,14 @@ Uses godotenv for `.env` loading
 
 ## MCP Implementation Details
 
-**Tool**: `gpt_websearch` - web search using GPT models with:
+**Tool**: `gpt_websearch` - web search with the configured provider:
 
--   Model selection: gpt-5-nano/mini/full based on complexity
--   Reasoning effort: low/medium/high with timeout mapping
--   Query formulation: context-aware, detailed searches
--   Strategy: single/sequential/parallel based on task
+-   Provider registry in `provider.go` (endpoint, key env, tool type, models, prompt)
+-   Model selection per provider (OpenAI: gpt-5.4 family; DeepSeek: deepseek-v4-flash)
+-   Reasoning effort: none/low/medium/high/xhigh with timeout mapping (models.go)
+-   Continuity args (`previous_response_id`, `prompt_cache_key`) exposed only for OpenAI
 
-**Prompt Template**: `intelligent_web_search` (mcp_server.go:139-213) provides:
-
--   Systematic LLM instructions for cost-effective tool usage
--   Model selection guidelines by task complexity
--   Search strategy optimization (single/sequential/parallel)
--   Query formulation best practices
+**Prompt**: per-provider `intelligent_web_search` guidance in `prompts.go`, served via the MCP prompts resource.
 
 **Transports**:
 
@@ -90,10 +92,17 @@ Uses godotenv for `.env` loading
 
 ## API Integration
 
--   Endpoint: `https://api.openai.com/v1/responses`
--   Tool type: `web_search_preview`
--   Models: gpt-5.1, gpt-5-mini, gpt-5-nano
--   Effort-based timeouts: 3/5/10 minutes
+Both backends speak the OpenAI Responses API shape; differences live in `provider.go`:
+
+|                | `openai`                              | `deepseek`                              |
+| -------------- | ------------------------------------- | --------------------------------------- |
+| Endpoint       | `https://api.openai.com/v1/responses` | `https://api.deepseek.com/responses`    |
+| Tool type      | `web_search_preview`                  | `web_search` (server-side execution)    |
+| Models         | gpt-5.4-nano / gpt-5.4-mini / gpt-5.4 | deepseek-v4-flash (v4-pro pending)      |
+| Continuity     | `previous_response_id`, `prompt_cache_key` | Stateless — both params dropped   |
+
+-   Effort-based timeouts: 90s/3/5/10/15 minutes (none/low/medium/high/xhigh)
+-   `text.verbosity` must never be sent empty (DeepSeek rejects `""` with 400)
 
 ## Error Handling
 
@@ -105,7 +114,7 @@ Uses godotenv for `.env` loading
 
 1. CLI flags
 2. Environment variables
-3. Defaults (gpt-5-mini, low effort, 3min timeout)
+3. Defaults (provider's default model — gpt-5.4-mini / deepseek-v4-flash; medium effort, 5min timeout)
 
 ## Testing
 
@@ -115,7 +124,7 @@ Uses godotenv for `.env` loading
 
 ## Development Workflow
 
-1. Set `OPENAI_API_KEY`
+1. Set the API key for your provider (`OPENAI_API_KEY`, or `DEEPSEEK_API_KEY` with `PROVIDER=deepseek`)
 2. Make changes
 3. `./run_format.sh && ./run_lint.sh && ./run_test.sh`
 4. `go build -o bin/answer .`
