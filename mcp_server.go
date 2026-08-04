@@ -39,8 +39,10 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 		server.WithOutputSchemaValidation(),
 	)
 
+	prov := providerOrDefault(cfg.Provider)
+
 	// Add web search tool
-	mcpServer.AddTool(newGptWebsearchTool(), webSearchHandler(cfg.APIKey, cfg.BaseURL))
+	mcpServer.AddTool(newGptWebsearchTool(prov), webSearchHandler(cfg.APIKey, cfg.BaseURL, prov))
 
 	// Add server info resource
 	mcpServer.AddResource(
@@ -50,7 +52,7 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 			mcp.WithResourceDescription("Information about the GPT Web Search MCP server"),
 			mcp.WithMIMEType("text/plain"),
 		),
-		serverInfoHandler(cfg.BaseURL),
+		serverInfoHandler(cfg.BaseURL, prov.Name),
 	)
 
 	// Add models list resource
@@ -58,10 +60,10 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 		mcp.NewResource(
 			"models://list",
 			"Available Models",
-			mcp.WithResourceDescription("List of available GPT models with use cases and recommended parameters"),
+			mcp.WithResourceDescription("List of available models with use cases and recommended parameters"),
 			mcp.WithMIMEType("application/json"),
 		),
-		modelsHandler(),
+		modelsHandler(prov),
 	)
 
 	// Add intelligent web search prompt
@@ -73,7 +75,7 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 				mcp.ArgumentDescription("The question, task, problem, or instructions from the user that requires web search"),
 			),
 		),
-		webSearchPromptHandler(),
+		webSearchPromptHandler(prov),
 	)
 
 	return mcpServer
@@ -81,17 +83,18 @@ func NewMCPServer(cfg MCPConfig) *server.MCPServer {
 
 // newGptWebsearchTool builds the gpt_websearch tool definition with input
 // validation (additionalProperties:false, enum constraints) and a structured
-// output schema derived from WebSearchResult.
-func newGptWebsearchTool() mcp.Tool {
-	return mcp.NewTool("gpt_websearch",
-		mcp.WithDescription("Search the web using OpenAI's GPT model with web search capabilities"),
+// output schema derived from WebSearchResult. The schema adapts to the
+// provider: model default and continuity parameters differ.
+func newGptWebsearchTool(prov provider) mcp.Tool {
+	opts := []mcp.ToolOption{
+		mcp.WithDescription("Search the web using a deep-reasoning model with web search capabilities"),
 		mcp.WithString("query",
 			mcp.Required(),
 			mcp.Description("The search query or question to ask"),
 		),
 		mcp.WithString("model",
-			mcp.DefaultString(defaultModel),
-			mcp.Description("The GPT model to use (default: gpt-5.4-mini)"),
+			mcp.DefaultString(prov.DefaultModel),
+			mcp.Description(fmt.Sprintf("The model to use (default: %s)", prov.DefaultModel)),
 		),
 		mcp.WithString("reasoning_effort",
 			mcp.DefaultString(defaultEffort),
@@ -103,13 +106,19 @@ func newGptWebsearchTool() mcp.Tool {
 			mcp.Description("Response verbosity level: low (concise), medium (balanced), or high (detailed with explanations)"),
 			mcp.Enum(verbosityLevels...),
 		),
-		mcp.WithString("previous_response_id",
-			mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
-		),
-		mcp.WithString("prompt_cache_key",
-			mcp.Description("Optional: OpenAI prompt_cache_key. Requests sharing the same prefix and key "+
-				"reuse the same cache shard. Leave empty to use the server default (per-user when "+
-				"authenticated, otherwise server-wide).")),
+	}
+	if prov.SupportsContinuity {
+		opts = append(opts,
+			mcp.WithString("previous_response_id",
+				mcp.Description("Optional: Previous response ID for conversation continuity - improves performance by avoiding re-reasoning"),
+			),
+			mcp.WithString("prompt_cache_key",
+				mcp.Description("Optional: OpenAI prompt_cache_key. Requests sharing the same prefix and key "+
+					"reuse the same cache shard. Leave empty to use the server default (per-user when "+
+					"authenticated, otherwise server-wide).")),
+		)
+	}
+	opts = append(opts,
 		mcp.WithBoolean("web_search",
 			mcp.DefaultBool(true),
 			mcp.Description("Use web search (default: true)"),
@@ -117,6 +126,7 @@ func newGptWebsearchTool() mcp.Tool {
 		mcp.WithSchemaAdditionalProperties(false),
 		mcp.WithOutputSchema[WebSearchResult](),
 	)
+	return mcp.NewTool("gpt_websearch", opts...)
 }
 
 // webSearchHandler returns a handler for the web search tool.
@@ -124,7 +134,7 @@ func newGptWebsearchTool() mcp.Tool {
 // before this handler is ever reached; no auth logic is needed here.
 // User identity is logged opportunistically when present in the context
 // (set by the middleware on authenticated HTTP requests).
-func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func webSearchHandler(apiKey, baseURL string, prov provider) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
 
@@ -140,7 +150,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		model := request.GetString("model", defaultModel)
+		model := request.GetString("model", prov.DefaultModel)
 		effort := request.GetString("reasoning_effort", defaultEffort)
 		verbosity := request.GetString("verbosity", defaultVerbosity)
 		previousResponseID := request.GetString("previous_response_id", "")
@@ -153,6 +163,7 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 			query, model, effort, verbosity, webSearch))
 
 		result, err := HandleWebSearch(ctx, apiKey, baseURL, WebSearchParams{
+			Provider:           prov.Name,
 			Query:              query,
 			Model:              model,
 			Effort:             effort,
@@ -193,12 +204,12 @@ func webSearchHandler(apiKey, baseURL string) func(context.Context, mcp.CallTool
 }
 
 // serverInfoHandler returns a handler for the server info resource
-func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+func serverInfoHandler(baseURL, providerName string) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		// Log the resource access
 		logToClient(ctx, mcp.LoggingLevelDebug, "server_info", fmt.Sprintf("Server info resource accessed: URI=%s", request.Params.URI))
 
-		info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nEndpoint: %s\n", serverVersion, baseURL)
+		info := fmt.Sprintf("GPT Web Search MCP Server\nVersion: %s\nProvider: %s\nEndpoint: %s\n", serverVersion, providerName, baseURL)
 		return []mcp.ResourceContents{
 			mcp.TextResourceContents{
 				URI:      request.Params.URI,
@@ -210,7 +221,7 @@ func serverInfoHandler(baseURL string) func(context.Context, mcp.ReadResourceReq
 }
 
 // modelsHandler returns a handler for the models list resource
-func modelsHandler() func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+func modelsHandler(prov provider) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	type modelEntry struct {
 		Name              string `json:"name"`
 		Description       string `json:"description"`
@@ -223,10 +234,10 @@ func modelsHandler() func(context.Context, mcp.ReadResourceRequest) ([]mcp.Resou
 	}
 
 	payload := modelsPayload{
-		Default: modelMini,
-		Models:  make([]modelEntry, 0, len(modelRegistry)),
+		Default: prov.DefaultModel,
+		Models:  make([]modelEntry, 0, len(prov.Models)),
 	}
-	for _, m := range modelRegistry {
+	for _, m := range prov.Models {
 		// DisplayTimeout is derived from the effort registry — single source,
 		// zero duplication. The drift-guard test asserts every RecommendedEffort
 		// resolves, so the comma-ok miss path is defensive only.
@@ -261,7 +272,7 @@ func modelsHandler() func(context.Context, mcp.ReadResourceRequest) ([]mcp.Resou
 }
 
 // webSearchPromptHandler returns a handler for the intelligent web search prompt
-func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+func webSearchPromptHandler(prov provider) func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		userQuestion := request.Params.Arguments["user_question"]
 		if userQuestion == "" {
@@ -278,7 +289,7 @@ func webSearchPromptHandler() func(context.Context, mcp.GetPromptRequest) (*mcp.
 				Role: "user",
 				Content: mcp.TextContent{
 					Type: "text",
-					Text: webSearchPrompt + "\n<user_question>\n" + userQuestion + "\n</user_question>\n",
+					Text: prov.Prompt + "\n<user_question>\n" + userQuestion + "\n</user_question>\n",
 				},
 			},
 		}

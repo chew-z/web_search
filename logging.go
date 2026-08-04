@@ -40,6 +40,7 @@ func setVerbose(verbose bool) {
 // logStartup emits a standardized startup banner with server identity, runtime,
 // and effective configuration. Call once after all config is resolved.
 func logStartup(cfg MCPConfig) {
+	prov := providerOrDefault(cfg.Provider)
 	Info("server starting",
 		"name", serverName,
 		"version", serverVersion,
@@ -50,8 +51,9 @@ func logStartup(cfg MCPConfig) {
 		"auth_enabled", cfg.AuthEnabled,
 		"heartbeat", cfg.Heartbeat.String(),
 		"verbose", cfg.Verbose,
+		"provider", prov.Name,
 		"base_url", cfg.BaseURL,
-		"model_default", defaultModel,
+		"model_default", prov.DefaultModel,
 		"effort_default", defaultEffort,
 		"disable_localhost_protection", cfg.DisableLocalhostProtection,
 	)

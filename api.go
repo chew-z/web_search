@@ -43,6 +43,10 @@ type CallAPIParams struct {
 	PromptCacheKey     string
 	Timeout            time.Duration
 	UseWebSearch       bool
+	// WebSearchTool is the tool type sent when UseWebSearch is true
+	// (e.g. "web_search_preview" for OpenAI, "web_search" for DeepSeek).
+	// Empty falls back to the OpenAI tool type.
+	WebSearchTool string
 	// HTTPClient overrides the package-level default client when non-nil.
 	// Enables per-request / test injection without touching the global.
 	HTTPClient *http.Client
@@ -66,10 +70,10 @@ func CallAPI(ctx context.Context, p CallAPIParams) (*apiResponse, error) {
 		PromptCacheKey:     p.PromptCacheKey,
 	}
 
-	// Conditionally add web search tool
+	// Conditionally add web search tool (type is provider-specific).
 	if p.UseWebSearch {
 		body.Tools = []reqTool{
-			{Type: "web_search_preview"},
+			{Type: webSearchToolType(p.WebSearchTool)},
 		}
 	}
 
@@ -121,13 +125,56 @@ func clientOrDefault(c *http.Client) *http.Client {
 	return httpClient
 }
 
-// ExtractAnswer extracts the answer text from the API response
+// webSearchToolType picks the upstream web search tool type; the OpenAI
+// preview name is the fallback for callers that don't set one explicitly.
+func webSearchToolType(supplied string) string {
+	if supplied == "" {
+		return "web_search_preview"
+	}
+	return supplied
+}
+
+// noAnswerResult builds the failure result returned when the upstream
+// response carries no extractable answer text.
+func noAnswerResult(
+	ctx context.Context,
+	responseID, query, model, effort string,
+	useWebSearch bool,
+	previousResponseID string,
+	timeout time.Duration,
+) *WebSearchResult {
+	errMsg := "No answer found in response"
+	Warn("no answer in response", "model", model, "effort", effort, "response_id", responseID)
+	logToClient(ctx, mcp.LoggingLevelWarning, "api_handler", errMsg)
+	return &WebSearchResult{
+		Success:            false,
+		Error:              errMsg,
+		Query:              query,
+		RequestedModel:     model,
+		RequestedEffort:    effort,
+		WebSearchUsed:      useWebSearch,
+		TimeoutUsed:        timeout.String(),
+		PreviousResponseID: previousResponseID,
+	}
+}
+
+// ExtractAnswer extracts the answer text from the API response. When the
+// output contains tool-call items (e.g. web_search_call), only message items
+// after the last tool call are used: providers like DeepSeek emit
+// search-process narration as message items between tool calls, which must
+// not leak into the answer. Without tool calls all message items are joined.
 func ExtractAnswer(apiResp *apiResponse) string {
 	if apiResp == nil {
 		return ""
 	}
+	start := 0
+	for i, item := range apiResp.Output {
+		if strings.HasSuffix(item.Type, "_call") {
+			start = i + 1
+		}
+	}
 	var sb strings.Builder
-	for _, item := range apiResp.Output {
+	for _, item := range apiResp.Output[start:] {
 		if item.Type != "message" {
 			continue
 		}
@@ -148,6 +195,7 @@ func ExtractAnswer(apiResp *apiResponse) string {
 // plumbing. The MCP handler populates it from the validated tool-call request;
 // other (e.g. future non-MCP) callers can build it directly.
 type WebSearchParams struct {
+	Provider           string
 	Query              string
 	Model              string
 	Effort             string
@@ -185,9 +233,11 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 		}, nil
 	}
 
+	prov := providerOrDefault(p.Provider)
+
 	model := p.Model
 	if model == "" {
-		model = defaultModel
+		model = prov.DefaultModel
 	}
 	effort := validateEffort(p.Effort)
 	verbosity := validateVerbosity(p.Verbosity)
@@ -195,7 +245,15 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 	query := p.Query
 	previousResponseID, useWebSearch := p.PreviousResponseID, p.UseWebSearch
 	timeout := getTimeoutForEffort(effort)
-	cacheKey := resolvePromptCacheKey(ctx, p.PromptCacheKey)
+
+	// Stateless providers (DeepSeek) ignore continuity parameters; drop them
+	// so requests stay clean and behavior is explicit rather than silent.
+	cacheKey := ""
+	if prov.SupportsContinuity {
+		cacheKey = resolvePromptCacheKey(ctx, p.PromptCacheKey)
+	} else {
+		previousResponseID = ""
+	}
 
 	apiResp, err := CallAPI(ctx, CallAPIParams{
 		APIKey:             apiKey,
@@ -208,6 +266,7 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 		PromptCacheKey:     cacheKey,
 		Timeout:            timeout,
 		UseWebSearch:       useWebSearch,
+		WebSearchTool:      prov.WebSearchTool,
 	})
 	if err != nil {
 		return nil, err
@@ -215,19 +274,7 @@ func HandleWebSearch(ctx context.Context, apiKey, baseURL string, p WebSearchPar
 
 	answer := ExtractAnswer(apiResp)
 	if answer == "" {
-		errMsg := "No answer found in response"
-		Warn("no answer in response", "model", model, "effort", effort, "response_id", apiResp.ID)
-		logToClient(ctx, mcp.LoggingLevelWarning, "api_handler", errMsg)
-		return &WebSearchResult{
-			Success:            false,
-			Error:              errMsg,
-			Query:              query,
-			RequestedModel:     model,
-			RequestedEffort:    effort,
-			WebSearchUsed:      useWebSearch,
-			TimeoutUsed:        timeout.String(),
-			PreviousResponseID: previousResponseID,
-		}, nil
+		return noAnswerResult(ctx, apiResp.ID, query, model, effort, useWebSearch, previousResponseID, timeout), nil
 	}
 
 	Debug("search completed", "model", apiResp.Model, "effort", apiResp.Reasoning.Effort, "answer_chars", len(answer), "response_id", apiResp.ID)

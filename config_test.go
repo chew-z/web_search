@@ -114,6 +114,7 @@ func TestLoadEnvConfig_Table(t *testing.T) {
 		t.Helper()
 		// Clear all vars read by loadEnvConfig to keep tests hermetic.
 		t.Setenv("OPENAI_API_KEY", "")
+		t.Setenv("PROVIDER", "")
 		t.Setenv("QUESTION", "")
 		t.Setenv("MODEL", "")
 		t.Setenv("EFFORT", "")
@@ -129,7 +130,7 @@ func TestLoadEnvConfig_Table(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			got, err := loadEnvConfig()
+			got, err := loadEnvConfig("")
 
 			if tt.want.err != nil {
 				if !errors.Is(err, tt.want.err) {
@@ -174,6 +175,9 @@ func TestParseMCPConfig_Defaults(t *testing.T) {
 
 	got := parseMCPConfig(MCPConfigParams{})
 
+	if got.Provider != providerOpenAI {
+		t.Errorf("Provider = %q, want %q", got.Provider, providerOpenAI)
+	}
 	if got.APIKey != "" {
 		t.Errorf("APIKey = %q, want empty", got.APIKey)
 	}
@@ -198,6 +202,7 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 	t.Parallel()
 
 	want := MCPConfig{
+		Provider:      providerDeepSeek,
 		APIKey:        "k",
 		BaseURL:       "http://example.local",
 		Transport:     "http",
@@ -210,6 +215,7 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 	}
 
 	got := parseMCPConfig(MCPConfigParams{
+		Provider:      want.Provider,
 		APIKey:        want.APIKey,
 		BaseURL:       want.BaseURL,
 		Transport:     want.Transport,
@@ -223,6 +229,16 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 
 	if got != want {
 		t.Errorf("parseMCPConfig = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseMCPConfig_DeepSeekBaseURLDefault(t *testing.T) {
+	t.Parallel()
+
+	got := parseMCPConfig(MCPConfigParams{Provider: providerDeepSeek})
+
+	if got.BaseURL != deepseekBaseURL {
+		t.Errorf("BaseURL = %q, want %q", got.BaseURL, deepseekBaseURL)
 	}
 }
 
@@ -295,6 +311,101 @@ func TestValidateVerbosity(t *testing.T) {
 			t.Parallel()
 			if got := validateVerbosity(tt.in); got != tt.want {
 				t.Errorf("validateVerbosity(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadEnvConfig_Provider(t *testing.T) {
+	clear := func(t *testing.T) {
+		t.Helper()
+		t.Setenv("PROVIDER", "")
+		t.Setenv("OPENAI_API_KEY", "")
+		t.Setenv("DEEPSEEK_API_KEY", "")
+	}
+
+	t.Run("deepseek_env_reads_deepseek_key", func(t *testing.T) {
+		clear(t)
+		t.Setenv("PROVIDER", "deepseek")
+		t.Setenv("DEEPSEEK_API_KEY", "dk")
+
+		got, err := loadEnvConfig("")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Provider != providerDeepSeek {
+			t.Errorf("Provider = %q, want %q", got.Provider, providerDeepSeek)
+		}
+		if got.APIKey != "dk" {
+			t.Errorf("APIKey = %q, want %q", got.APIKey, "dk")
+		}
+	})
+
+	t.Run("override_beats_env", func(t *testing.T) {
+		clear(t)
+		t.Setenv("PROVIDER", "openai")
+		t.Setenv("DEEPSEEK_API_KEY", "dk")
+
+		got, err := loadEnvConfig("deepseek")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Provider != providerDeepSeek || got.APIKey != "dk" {
+			t.Errorf("got Provider=%q APIKey=%q, want deepseek/dk", got.Provider, got.APIKey)
+		}
+	})
+
+	t.Run("unknown_provider_errors", func(t *testing.T) {
+		clear(t)
+		t.Setenv("PROVIDER", "bogus")
+
+		_, err := loadEnvConfig("")
+		if !errors.Is(err, ErrInvalidProvider) {
+			t.Fatalf("error = %v, want ErrInvalidProvider", err)
+		}
+	})
+
+	t.Run("deepseek_missing_key_errors", func(t *testing.T) {
+		clear(t)
+		t.Setenv("PROVIDER", "deepseek")
+
+		_, err := loadEnvConfig("")
+		if !errors.Is(err, ErrNoAPIKey) {
+			t.Fatalf("error = %v, want ErrNoAPIKey", err)
+		}
+	})
+}
+
+func TestResolveProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"", providerOpenAI, false},
+		{"openai", providerOpenAI, false},
+		{"deepseek", providerDeepSeek, false},
+		{"bogus", "", true},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run("in="+tt.in, func(t *testing.T) {
+			t.Parallel()
+			got, err := resolveProvider(tt.in)
+			if tt.wantErr {
+				if !errors.Is(err, ErrInvalidProvider) {
+					t.Fatalf("error = %v, want ErrInvalidProvider", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Name != tt.want {
+				t.Errorf("resolveProvider(%q).Name = %q, want %q", tt.in, got.Name, tt.want)
 			}
 		})
 	}

@@ -65,12 +65,28 @@ GOEXPERIMENT=jsonv2 go install github.com/chew-z/web_search@latest
 
 ## Configuration
 
+### Providers
+
+Answer can talk to two Responses API backends, selected with the `PROVIDER`
+environment variable or the `-provider` flag (flag wins):
+
+| Provider   | API key env        | Default model    | Notes                                                                     |
+| ---------- | ------------------ | ---------------- | ------------------------------------------------------------------------- |
+| `openai`   | `OPENAI_API_KEY`   | `gpt-5.4-mini`   | Default. Supports conversation continuity (`previous_response_id`).        |
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-v4-flash` | Stateless: `previous_response_id`/`prompt_cache_key` are not sent. Web search runs server-side. |
+
+The base URL, web-search tool type, model defaults, and the MCP guidance
+prompt all adapt to the selected provider; `-base` still overrides the
+endpoint explicitly.
+
 ### Environment Variables
 
 Create a `.env` file in the project root:
 
 ```env
 OPENAI_API_KEY=your-api-key-here
+PROVIDER=openai          # Optional: openai (default) or deepseek
+DEEPSEEK_API_KEY=        # Required when PROVIDER=deepseek
 MODEL=gpt-5-mini         # Optional: gpt-5-mini (default), gpt-5.1, gpt-5-nano
 EFFORT=low               # Optional: reasoning effort (low/medium/high, default: medium)
 SHOW_ALL=false           # Optional: show raw JSON
@@ -258,11 +274,12 @@ answer [options] [question]
 
 Options:
   -q, -question    Question to ask (required, can also use positional argument)
+  -provider       API provider: openai (default) or deepseek (env PROVIDER)
   -model          Model: gpt-5-mini (default), gpt-5.1, gpt-5-nano
   -effort         Reasoning effort: low (3min), medium (5min), high (10min timeout) (default: medium)
   -timeout        Request timeout (overrides effort-based defaults)
   -show-all       Show raw JSON response
-  -base           API endpoint URL
+  -base           API endpoint URL (default: provider-specific)
   -web-search     Use web search (default: true)
 ```
 
@@ -273,9 +290,10 @@ answer mcp [options]
 
 Options:
   -t, --transport  Transport type: stdio or http (default: stdio)
+  -provider       API provider: openai (default) or deepseek (env PROVIDER)
   -port           HTTP server port (default: 8080)
   -host           HTTP server host (default: 127.0.0.1)
-  -base           API endpoint URL
+  -base           API endpoint URL (default: provider-specific)
   -verbose        Enable verbose logging
 ```
 

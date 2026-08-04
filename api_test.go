@@ -439,6 +439,34 @@ func TestExtractAnswer(t *testing.T) {
 			},
 			want: "",
 		},
+		{
+			name: "narration_around_tool_calls_stripped",
+			apiResp: &apiResponse{
+				Output: []respItem{
+					{
+						Type: "message",
+						Content: []respContent{
+							{Type: "output_text", Text: "I'll search for that."},
+						},
+					},
+					{Type: "web_search_call"},
+					{
+						Type: "message",
+						Content: []respContent{
+							{Type: "output_text", Text: "Let me check more sources."},
+						},
+					},
+					{Type: "web_search_call"},
+					{
+						Type: "message",
+						Content: []respContent{
+							{Type: "output_text", Text: "The final answer."},
+						},
+					},
+				},
+			},
+			want: "The final answer.",
+		},
 	}
 
 	for _, tt := range tests {

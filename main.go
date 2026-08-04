@@ -11,6 +11,7 @@ import (
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
@@ -36,13 +37,14 @@ func runMCPMode() {
 	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
 
 	var (
-		transport   = mcpFlags.String("t", "stdio", "Transport type (stdio or http)")
-		port        = mcpFlags.String("port", "8080", "HTTP server port")
-		host        = mcpFlags.String("host", "127.0.0.1", "HTTP server host (default: 127.0.0.1)")
-		baseURL     = mcpFlags.String("base", defaultBaseURL, "API base URL")
-		verbose     = mcpFlags.Bool("verbose", false, "Enable verbose logging")
-		authEnabled = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires GEMINI_AUTH_SECRET_KEY env var)")
-		heartbeat   = mcpFlags.Duration("heartbeat", 30*time.Second,
+		transport    = mcpFlags.String("t", "stdio", "Transport type (stdio or http)")
+		port         = mcpFlags.String("port", "8080", "HTTP server port")
+		host         = mcpFlags.String("host", "127.0.0.1", "HTTP server host (default: 127.0.0.1)")
+		baseURL      = mcpFlags.String("base", "", "API base URL (default: provider-specific)")
+		providerName = mcpFlags.String("provider", "", "API provider: openai or deepseek (default: env PROVIDER, else openai)")
+		verbose      = mcpFlags.Bool("verbose", false, "Enable verbose logging")
+		authEnabled  = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires GEMINI_AUTH_SECRET_KEY env var)")
+		heartbeat    = mcpFlags.Duration("heartbeat", 30*time.Second,
 			"SSE heartbeat interval for HTTP transport (0 to disable); keeps long-running requests alive through proxies")
 	)
 
@@ -66,17 +68,17 @@ func runMCPMode() {
 	// Honor -verbose for logger level
 	setVerbose(*verbose)
 
-	// Load environment config
-	envCfg, err := loadEnvConfig()
+	// Load environment config (validates the provider and reads its API key)
+	envCfg, err := loadEnvConfig(*providerName)
 	if err != nil {
 		Error("Failed to load config", "error", err)
 		os.Exit(1)
 	}
 
 	// Read auth secret from environment (same variable as GeminiMCP for interoperability)
-	authSecretKey := os.Getenv("GEMINI_AUTH_SECRET_KEY")
-	if *authEnabled && authSecretKey == "" {
-		Error("GEMINI_AUTH_SECRET_KEY must be set when --auth-enabled is used")
+	authSecretKey, err := requireAuthSecret(*authEnabled)
+	if err != nil {
+		Error(err.Error())
 		os.Exit(1)
 	}
 
@@ -86,6 +88,7 @@ func runMCPMode() {
 
 	// Create server configuration using the config helper
 	cfg := parseMCPConfig(MCPConfigParams{
+		Provider:                   envCfg.Provider,
 		APIKey:                     envCfg.APIKey,
 		BaseURL:                    *baseURL,
 		Transport:                  *transport,
@@ -103,7 +106,11 @@ func runMCPMode() {
 
 	logStartup(cfg)
 
-	// Run with appropriate transport
+	runTransport(mcpServer, cfg)
+}
+
+// runTransport starts the configured transport and exits on failure.
+func runTransport(mcpServer *server.MCPServer, cfg MCPConfig) {
 	switch cfg.Transport {
 	case "stdio":
 		if err := RunStdioTransport(mcpServer); err != nil {
@@ -121,8 +128,43 @@ func runMCPMode() {
 	}
 }
 
+// requireAuthSecret reads the JWT secret (same variable as GeminiMCP for
+// interoperability) and enforces its presence when auth is enabled.
+func requireAuthSecret(authEnabled bool) (string, error) {
+	key := os.Getenv("GEMINI_AUTH_SECRET_KEY")
+	if authEnabled && key == "" {
+		return "", errors.New("GEMINI_AUTH_SECRET_KEY must be set when --auth-enabled is used")
+	}
+	return key, nil
+}
+
+// reloadEnvForProvider re-resolves environment config when a -provider flag
+// override changes the effective provider (different API key env, defaults).
+// It also validates the provider name.
+func reloadEnvForProvider(envCfg EnvConfig, provider string) (EnvConfig, error) {
+	if provider == envCfg.Provider {
+		return envCfg, nil
+	}
+	return loadEnvConfig(provider)
+}
+
+// resolveEndpointAndModel applies provider defaults when the user did not
+// supply an explicit -base / -model.
+func resolveEndpointAndModel(args cliArgs, envCfg EnvConfig, prov provider) (baseURL, model string) {
+	baseURL = args.baseURL
+	if baseURL == "" {
+		baseURL = prov.DefaultBaseURL
+	}
+	model = args.model
+	if !flagWasSet("model") && envCfg.Model == "" {
+		model = prov.DefaultModel
+	}
+	return baseURL, model
+}
+
 // cliArgs holds the resolved command-line + environment configuration for runCLI.
 type cliArgs struct {
+	provider       string
 	baseURL        string
 	model          string
 	effort         string
@@ -135,7 +177,7 @@ type cliArgs struct {
 }
 
 func parseCLIArgs(envCfg EnvConfig) cliArgs {
-	defaultModelVal := defaultModel
+	defaultModelVal := providerOrDefault(envCfg.Provider).DefaultModel
 	if envCfg.Model != "" {
 		defaultModelVal = envCfg.Model
 	}
@@ -144,7 +186,8 @@ func parseCLIArgs(envCfg EnvConfig) cliArgs {
 		defaultEffortVal = envCfg.Effort
 	}
 
-	baseURL := flag.String("base", defaultBaseURL, "API endpoint")
+	provider := flag.String("provider", envCfg.Provider, "API provider: openai or deepseek (env PROVIDER)")
+	baseURL := flag.String("base", "", "API endpoint (default: provider-specific)")
 	model := flag.String("model", defaultModelVal, "model (env MODEL)")
 	effort := flag.String("effort", defaultEffortVal, "effort (env EFFORT)")
 	verbosity := flag.String("verbosity", defaultVerbosity, "response verbosity (low, medium, high)")
@@ -170,6 +213,7 @@ func parseCLIArgs(envCfg EnvConfig) cliArgs {
 	}
 
 	return cliArgs{
+		provider:       *provider,
 		baseURL:        *baseURL,
 		model:          *model,
 		effort:         *effort,
@@ -203,27 +247,43 @@ func flagWasSet(name string) bool {
 }
 
 func runCLI() error {
-	envCfg, err := loadEnvConfig()
+	envCfg, err := loadEnvConfig("")
 	if err != nil {
 		return &exitError{2, err.Error()}
 	}
 
 	args := parseCLIArgs(envCfg)
+
+	envCfg, err = reloadEnvForProvider(envCfg, args.provider)
+	if err != nil {
+		return &exitError{2, err.Error()}
+	}
+	prov := providerOrDefault(envCfg.Provider)
+
 	if args.question == "" {
 		return &exitError{2, "please provide a question to ask (use -q flag or positional argument)"}
 	}
 
+	baseURL, model := resolveEndpointAndModel(args, envCfg, prov)
+
 	ctx := context.Background()
+
+	cacheKey := ""
+	if prov.SupportsContinuity {
+		cacheKey = resolvePromptCacheKey(ctx, args.promptCacheKey)
+	}
+
 	apiResp, err := CallAPI(ctx, CallAPIParams{
 		APIKey:         envCfg.APIKey,
-		BaseURL:        args.baseURL,
+		BaseURL:        baseURL,
 		Query:          args.question,
-		Model:          args.model,
+		Model:          model,
 		Effort:         args.effort,
 		Verbosity:      args.verbosity,
-		PromptCacheKey: resolvePromptCacheKey(ctx, args.promptCacheKey),
+		PromptCacheKey: cacheKey,
 		Timeout:        args.timeout,
 		UseWebSearch:   args.useWebSearch,
+		WebSearchTool:  prov.WebSearchTool,
 	})
 	if err != nil {
 		return &exitError{2, err.Error()}

@@ -8,7 +8,8 @@ import (
 
 var (
 	// Configuration errors
-	ErrNoAPIKey = errors.New("OPENAI_API_KEY environment variable is required")
+	ErrNoAPIKey        = errors.New("environment variable is required")
+	ErrInvalidProvider = errors.New("invalid provider")
 )
 
 // APIError represents an error from the OpenAI API

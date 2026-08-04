@@ -40,13 +40,15 @@ func assertExitError(t *testing.T, err error, wantCode int, wantMsg string) {
 }
 
 // TestRunCLI_MissingAPIKey covers the loadEnvConfig failure path: exit code 2,
-// message is ErrNoAPIKey.Error(). t.Setenv overrides the autoloaded .env.
+// message names the provider's required env var. t.Setenv overrides the
+// autoloaded .env.
 func TestRunCLI_MissingAPIKey(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("PROVIDER", "")
 	resetCLIState(t, []string{"answer", "some question"})
 
 	err := runCLI()
-	assertExitError(t, err, 2, ErrNoAPIKey.Error())
+	assertExitError(t, err, 2, "OPENAI_API_KEY "+ErrNoAPIKey.Error())
 }
 
 // TestRunCLI_NoQuestion covers the empty-question path: exit code 2 with the

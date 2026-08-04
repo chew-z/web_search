@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -81,6 +82,7 @@ type apiReasoning struct {
 
 // EnvConfig centralizes environment-derived configuration.
 type EnvConfig struct {
+	Provider   string
 	Question   string
 	Model      string
 	Effort     string
@@ -93,6 +95,7 @@ type EnvConfig struct {
 
 // MCPConfig holds configuration for the MCP server
 type MCPConfig struct {
+	Provider                   string
 	APIKey                     string
 	BaseURL                    string
 	Transport                  string
@@ -116,9 +119,22 @@ func parseEnvBool(key string, defaultVal bool) bool {
 	return defaultVal
 }
 
-// loadEnvConfig reads environment variables
-func loadEnvConfig() (EnvConfig, error) {
+// loadEnvConfig reads environment variables. providerOverride selects the
+// backend explicitly (e.g. from a -provider flag); when empty the PROVIDER
+// env var decides, defaulting to openai. The API key is read from the
+// resolved provider's own env var.
+func loadEnvConfig(providerOverride string) (EnvConfig, error) {
+	name := providerOverride
+	if name == "" {
+		name = os.Getenv("PROVIDER")
+	}
+	prov, err := resolveProvider(name)
+	if err != nil {
+		return EnvConfig{}, err
+	}
+
 	cfg := EnvConfig{
+		Provider: prov.Name,
 		Question: os.Getenv("QUESTION"),
 		Model:    os.Getenv("MODEL"),
 		Effort:   os.Getenv("EFFORT"),
@@ -138,9 +154,9 @@ func loadEnvConfig() (EnvConfig, error) {
 		}
 	}
 
-	cfg.APIKey = os.Getenv("OPENAI_API_KEY")
+	cfg.APIKey = os.Getenv(prov.KeyEnv)
 	if cfg.APIKey == "" {
-		return EnvConfig{}, ErrNoAPIKey
+		return EnvConfig{}, fmt.Errorf("%s %w", prov.KeyEnv, ErrNoAPIKey)
 	}
 
 	return cfg, nil
@@ -183,6 +199,7 @@ func validateVerbosity(verbosity string) string {
 // Using a struct avoids a long positional parameter list and makes call sites
 // readable without per-argument comments.
 type MCPConfigParams struct {
+	Provider                   string
 	APIKey                     string
 	BaseURL                    string
 	Transport                  string
@@ -196,11 +213,15 @@ type MCPConfigParams struct {
 }
 
 // parseMCPConfig creates MCPConfig from the supplied parameters, applying
-// defaults where the caller left a field empty/zero.
+// defaults where the caller left a field empty/zero. The base URL default is
+// provider-specific; unknown provider names fall back to the default provider
+// (the name is validated upstream at flag/env parsing).
 func parseMCPConfig(p MCPConfigParams) MCPConfig {
+	prov := providerOrDefault(p.Provider)
+
 	// Use defaults if not provided
 	if p.BaseURL == "" {
-		p.BaseURL = defaultBaseURL
+		p.BaseURL = prov.DefaultBaseURL
 	}
 	if p.Transport == "" {
 		p.Transport = "stdio"
@@ -213,6 +234,7 @@ func parseMCPConfig(p MCPConfigParams) MCPConfig {
 	}
 
 	return MCPConfig{
+		Provider:                   prov.Name,
 		APIKey:                     p.APIKey,
 		BaseURL:                    p.BaseURL,
 		Transport:                  p.Transport,
