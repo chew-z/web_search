@@ -81,6 +81,29 @@ func TestRunCLI_CallAPIError(t *testing.T) {
 	assertExitError(t, err, 2, wantMsg)
 }
 
+// TestRunCLI_ProviderOverrideSkipsDefaultKeyCheck covers the DeepSeek-only
+// setup: OPENAI_API_KEY absent, DEEPSEEK_API_KEY set, -provider deepseek.
+// The run must not fail on the default provider's missing key; reaching the
+// stub endpoint (exit 3, empty answer) proves credential validation used the
+// overridden provider.
+func TestRunCLI_ProviderOverrideSkipsDefaultKeyCheck(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"x","model":"m","reasoning":{"effort":"low"},"output":[]}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	t.Setenv("PROVIDER", "")
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("DEEPSEEK_API_KEY", "dk")
+	t.Setenv("QUESTION", "")
+	resetCLIState(t, []string{"answer", "-provider", "deepseek", "-base", srv.URL, "ping"})
+
+	err := runCLI()
+	assertExitError(t, err, 3, "no answer found in response")
+}
+
 // TestRunCLI_EmptyAnswer covers the empty-answer path: a 200 response with no
 // output_text yields exit code 3 with "no answer found in response".
 func TestRunCLI_EmptyAnswer(t *testing.T) {

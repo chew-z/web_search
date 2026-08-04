@@ -138,16 +138,6 @@ func requireAuthSecret(authEnabled bool) (string, error) {
 	return key, nil
 }
 
-// reloadEnvForProvider re-resolves environment config when a -provider flag
-// override changes the effective provider (different API key env, defaults).
-// It also validates the provider name.
-func reloadEnvForProvider(envCfg EnvConfig, provider string) (EnvConfig, error) {
-	if provider == envCfg.Provider {
-		return envCfg, nil
-	}
-	return loadEnvConfig(provider)
-}
-
 // resolveEndpointAndModel applies provider defaults when the user did not
 // supply an explicit -base / -model.
 func resolveEndpointAndModel(args cliArgs, envCfg EnvConfig, prov provider) (baseURL, model string) {
@@ -247,14 +237,15 @@ func flagWasSet(name string) bool {
 }
 
 func runCLI() error {
-	envCfg, err := loadEnvConfig("")
-	if err != nil {
-		return &exitError{2, err.Error()}
-	}
+	// Advisory load for flag defaults only: its error is ignored because the
+	// effective provider is unknown until flags are parsed. The authoritative
+	// load below uses the post-parse provider, so `-provider deepseek` works
+	// even when only DEEPSEEK_API_KEY is configured.
+	envDefaults, _ := loadEnvConfig("") //nolint:errcheck // see comment above
 
-	args := parseCLIArgs(envCfg)
+	args := parseCLIArgs(envDefaults)
 
-	envCfg, err = reloadEnvForProvider(envCfg, args.provider)
+	envCfg, err := loadEnvConfig(args.provider)
 	if err != nil {
 		return &exitError{2, err.Error()}
 	}
