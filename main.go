@@ -24,8 +24,7 @@ func main() {
 	// Original CLI mode. main is the single exit point: runCLI returns errors
 	// (so it is unit-testable) and we map them back to the original exit codes.
 	if err := runCLI(); err != nil {
-		var ee *exitError
-		if errors.As(err, &ee) {
+		if ee, ok := errors.AsType[*exitError](err); ok {
 			fail(ee.code, ee.msg)
 		}
 		fail(1, err.Error())
@@ -241,7 +240,7 @@ func runCLI() error {
 	// effective provider is unknown until flags are parsed. The authoritative
 	// load below uses the post-parse provider, so `-provider deepseek` works
 	// even when only DEEPSEEK_API_KEY is configured.
-	envDefaults, _ := loadEnvConfig("") //nolint:errcheck // see comment above
+	envDefaults, _ := loadEnvConfig("") // error ignored: see comment above
 
 	args := parseCLIArgs(envDefaults)
 
@@ -281,7 +280,7 @@ func runCLI() error {
 	}
 
 	if args.showAll {
-		raw, _ := json.Marshal(apiResp, jsontext.WithIndent("  ")) //nolint:errcheck // Debug output, error ok to ignore
+		raw, _ := json.Marshal(apiResp, jsontext.WithIndent("  ")) // debug output; error ok to ignore
 		fmt.Println(string(raw))
 		return nil
 	}

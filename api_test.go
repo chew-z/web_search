@@ -15,13 +15,13 @@ import (
 )
 
 // Helper: start a JSON httptest server with a provided handler.
-func newJSONServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, string) {
+func newJSONServer(t *testing.T, handler http.HandlerFunc) string {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(func() {
 		srv.Close()
 	})
-	return srv, srv.URL
+	return srv.URL
 }
 
 // Helper: set multiple env vars for the duration of the test.
@@ -105,7 +105,7 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 		})
 	}
 
-	_, base := newJSONServer(t, handler)
+	base := newJSONServer(t, handler)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -177,7 +177,7 @@ func TestCallAPI_Success_WebSearchFalse_OmitsTools(t *testing.T) {
 		})
 	}
 
-	_, base := newJSONServer(t, handler)
+	base := newJSONServer(t, handler)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -209,7 +209,7 @@ func TestCallAPI_MalformedJSONResponse(t *testing.T) {
 		_, _ = w.Write([]byte("this is not valid json"))
 	}
 
-	_, base := newJSONServer(t, handler)
+	base := newJSONServer(t, handler)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -249,7 +249,6 @@ func TestCallAPI_Non2xxErrors_401_403_429(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -257,7 +256,7 @@ func TestCallAPI_Non2xxErrors_401_403_429(t *testing.T) {
 				writeJSON(t, w, c.status, c.respBody)
 			}
 
-			_, base := newJSONServer(t, handler)
+			base := newJSONServer(t, handler)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -297,7 +296,7 @@ func TestCallAPI_Timeout(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		writeJSON(t, w, http.StatusOK, map[string]any{"ok": true})
 	}
-	_, base := newJSONServer(t, handler)
+	base := newJSONServer(t, handler)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -319,7 +318,7 @@ func TestCallAPI_Timeout(t *testing.T) {
 	// Accept either context deadline exceeded or a net.Error that timeouts.
 	if !errors.Is(err, context.DeadlineExceeded) {
 		var nerr net.Error
-		if !(errors.As(err, &nerr) && nerr.Timeout()) {
+		if !errors.As(err, &nerr) || !nerr.Timeout() {
 			t.Fatalf("expected timeout (deadline exceeded or net.Error), got %v", err)
 		}
 	}
@@ -332,7 +331,7 @@ func TestCallAPI_MissingAPIKey(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(t, w, http.StatusOK, map[string]any{"ok": true})
 	}
-	_, base := newJSONServer(t, handler)
+	base := newJSONServer(t, handler)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -522,7 +521,6 @@ func TestResolvePromptCacheKey(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if got := resolvePromptCacheKey(tt.ctx, tt.supplied); got != tt.want {

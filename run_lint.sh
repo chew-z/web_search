@@ -1,18 +1,21 @@
 #!/bin/sh
+set -eu
 
-# Ensure Go tools are in PATH
-export PATH="/usr/local/go/bin:$PATH"
+# Run golangci-lint: delegates to Task once; runs it directly when called from a task.
+cd "$(dirname "$0")"
+# Ensure Go tools are in PATH. Appended, not prepended, so a Go already on
+# PATH (Homebrew, asdf, a newer toolchain) still wins.
+export PATH="${PATH}:/usr/local/go/bin"
 
-# Required for encoding/json/v2 + encoding/json/jsontext imports (Go 1.26);
-# golangci-lint loads packages and would otherwise fail the build constraint.
-export GOEXPERIMENT=jsonv2
-
-# Set cache directories (use existing HOME or fallback)
-if [ -z "$HOME" ]; then
-    export HOME="$PWD"
+if [ -z "${HOME:-}" ]; then export HOME="$PWD"; fi
+if [ "$(uname -s)" = "Darwin" ]; then
+  export GOLANGCI_LINT_CACHE="${HOME}/Library/Caches/golangci-lint"
+else
+  export GOLANGCI_LINT_CACHE="${XDG_CACHE_HOME:-${HOME}/.cache}/golangci-lint"
 fi
-export GOLANGCI_LINT_CACHE="$HOME/Library/Caches/golangci-lint"
-export GOCACHE="$HOME/.cache/go-build"
+export GOCACHE="${XDG_CACHE_HOME:-${HOME}/.cache}/go-build"
 
-# Run linter using PATH
-golangci-lint run --fix ./...
+if [ -z "${RUN_WRAPPER_IN_TASK:-}" ] && command -v task >/dev/null 2>&1; then
+  RUN_WRAPPER_IN_TASK=1 exec task lint
+fi
+exec golangci-lint run --fix ./...

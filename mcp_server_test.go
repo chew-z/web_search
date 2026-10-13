@@ -44,11 +44,11 @@ func newTestMCPHandler(t *testing.T) http.Handler {
 }
 
 // newHTTPServerFromHandler creates an httptest server around a provided handler.
-func newHTTPServerFromHandler(t *testing.T, h http.Handler) (*httptest.Server, string) {
+func newHTTPServerFromHandler(t *testing.T, h http.Handler) string {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(func() { srv.Close() })
-	return srv, srv.URL
+	return srv.URL
 }
 
 // withTimeout builds a context with timeout for HTTP requests.
@@ -59,8 +59,7 @@ func withTimeout(t *testing.T, d time.Duration) (context.Context, context.Cancel
 
 func TestMCPServer_HTTP_HealthRoute(t *testing.T) {
 	handler := newTestMCPHandler(t)
-	server, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = server // cleaned up by t.Cleanup
+	baseURL := newHTTPServerFromHandler(t, handler)
 
 	tests := []struct {
 		name       string
@@ -74,7 +73,6 @@ func TestMCPServer_HTTP_HealthRoute(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -89,7 +87,7 @@ func TestMCPServer_HTTP_HealthRoute(t *testing.T) {
 			if err != nil {
 				t.Fatalf("http do: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != tt.wantStatus {
 				t.Fatalf("unexpected status for %s %s: got %d, want %d", tt.method, tt.path, resp.StatusCode, tt.wantStatus)
@@ -123,12 +121,12 @@ func newStatelessMCPHandler(t *testing.T, baseURL string) http.Handler {
 // jsonrpcCall posts a JSON-RPC request to the given URL and returns the parsed
 // response. It accepts both application/json and text/event-stream replies and
 // extracts the JSON payload from the first SSE `data:` line if needed.
-func jsonrpcCall(t *testing.T, url, method string, id int, params any) map[string]any {
+func jsonrpcCall(t *testing.T, url, method string, params any) map[string]any {
 	t.Helper()
 	body := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  method,
-		"id":      id,
+		"id":      1,
 	}
 	if params != nil {
 		body["params"] = params
@@ -152,7 +150,7 @@ func jsonrpcCall(t *testing.T, url, method string, id int, params any) map[strin
 	if err != nil {
 		t.Fatalf("http do: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -166,7 +164,7 @@ func jsonrpcCall(t *testing.T, url, method string, id int, params any) map[strin
 	if ct := resp.Header.Get("Content-Type"); strings.Contains(ct, "text/event-stream") {
 		// Collect all `data:` frames from the SSE stream.
 		var frames [][]byte
-		for _, line := range bytes.Split(raw, []byte("\n")) {
+		for line := range bytes.SplitSeq(raw, []byte("\n")) {
 			line = bytes.TrimRight(line, "\r")
 			if bytes.HasPrefix(line, []byte("data:")) {
 				frames = append(frames, bytes.TrimSpace(line[len("data:"):]))
@@ -220,10 +218,9 @@ func TestMCPServer_Initialize_HasTitleAndWebsiteURL(t *testing.T) {
 	t.Parallel()
 
 	handler := newStatelessMCPHandler(t, defaultBaseURL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
-	resp := jsonrpcCall(t, baseURL+"/", "initialize", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "initialize", map[string]any{
 		"protocolVersion": "2024-11-05",
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "test", "version": "0.1"},
@@ -249,10 +246,9 @@ func TestGptWebsearch_ToolsList_SchemaShape(t *testing.T) {
 	t.Parallel()
 
 	handler := newStatelessMCPHandler(t, defaultBaseURL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
-	resp := jsonrpcCall(t, baseURL+"/", "tools/list", 1, map[string]any{})
+	resp := jsonrpcCall(t, baseURL+"/", "tools/list", map[string]any{})
 	res := jsonrpcResult(t, resp)
 
 	tools, ok := res["tools"].([]any)
@@ -367,7 +363,7 @@ func mockOpenAIServerForbidden(t *testing.T) (*httptest.Server, *atomic.Int32) {
 
 func callToolAndAssertError(t *testing.T, baseURL string, args map[string]any, mustMention string) {
 	t.Helper()
-	resp := jsonrpcCall(t, baseURL+"/", "tools/call", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "tools/call", map[string]any{
 		"name":      "gpt_websearch",
 		"arguments": args,
 	})
@@ -390,8 +386,7 @@ func TestGptWebsearch_InputValidation_RejectsUnknownEnum(t *testing.T) {
 
 	upstream, hits := mockOpenAIServerForbidden(t)
 	handler := newStatelessMCPHandler(t, upstream.URL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
 	callToolAndAssertError(t, baseURL, map[string]any{
 		"query":            "x",
@@ -408,8 +403,7 @@ func TestGptWebsearch_InputValidation_RejectsAdditionalProperty(t *testing.T) {
 
 	upstream, hits := mockOpenAIServerForbidden(t)
 	handler := newStatelessMCPHandler(t, upstream.URL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
 	callToolAndAssertError(t, baseURL, map[string]any{
 		"query": "x",
@@ -449,10 +443,9 @@ func TestGptWebsearch_OutputSchemaValidation_PassesForValidResult(t *testing.T) 
 	t.Cleanup(upstream.Close)
 
 	handler := newStatelessMCPHandler(t, upstream.URL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
-	resp := jsonrpcCall(t, baseURL+"/", "tools/call", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "tools/call", map[string]any{
 		"name": "gpt_websearch",
 		"arguments": map[string]any{
 			"query":            "capital of France",
@@ -512,11 +505,10 @@ func TestGptWebsearch_OmittedWebSearch_DefaultsTrue(t *testing.T) {
 	t.Cleanup(upstream.Close)
 
 	handler := newStatelessMCPHandler(t, upstream.URL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
 	// web_search deliberately omitted from arguments.
-	resp := jsonrpcCall(t, baseURL+"/", "tools/call", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "tools/call", map[string]any{
 		"name": "gpt_websearch",
 		"arguments": map[string]any{
 			"query": "anything",
@@ -545,8 +537,7 @@ func TestMCPServer_HTTP_ProxiedPaths(t *testing.T) {
 	t.Parallel()
 
 	handler := newTestMCPHandler(t)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
 	initBody := `{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1"}}}`
 
@@ -577,7 +568,7 @@ func TestMCPServer_HTTP_ProxiedPaths(t *testing.T) {
 			if err != nil {
 				t.Fatalf("http do: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != http.StatusOK {
 				body, _ := io.ReadAll(resp.Body)
@@ -591,10 +582,9 @@ func TestMCPServer_ServerInfoResource(t *testing.T) {
 	t.Parallel()
 
 	handler := newStatelessMCPHandler(t, defaultBaseURL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
-	resp := jsonrpcCall(t, baseURL+"/", "resources/read", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "resources/read", map[string]any{
 		"uri": "server://info",
 	})
 	res := jsonrpcResult(t, resp)
@@ -624,10 +614,9 @@ func TestMCPServer_ModelsListResource(t *testing.T) {
 	t.Parallel()
 
 	handler := newStatelessMCPHandler(t, defaultBaseURL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
-	resp := jsonrpcCall(t, baseURL+"/", "resources/read", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "resources/read", map[string]any{
 		"uri": "models://list",
 	})
 	res := jsonrpcResult(t, resp)
@@ -697,11 +686,10 @@ func TestMCPServer_WebSearchPrompt(t *testing.T) {
 	t.Parallel()
 
 	handler := newStatelessMCPHandler(t, defaultBaseURL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
 	question := "What is AI?"
-	resp := jsonrpcCall(t, baseURL+"/", "prompts/get", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "prompts/get", map[string]any{
 		"name":      "web_search",
 		"arguments": map[string]any{"user_question": question},
 	})
@@ -751,10 +739,9 @@ func TestMCPServer_WebSearchPrompt_MissingArgument(t *testing.T) {
 	t.Parallel()
 
 	handler := newStatelessMCPHandler(t, defaultBaseURL)
-	srv, baseURL := newHTTPServerFromHandler(t, handler)
-	_ = srv
+	baseURL := newHTTPServerFromHandler(t, handler)
 
-	resp := jsonrpcCall(t, baseURL+"/", "prompts/get", 1, map[string]any{
+	resp := jsonrpcCall(t, baseURL+"/", "prompts/get", map[string]any{
 		"name":      "web_search",
 		"arguments": map[string]any{},
 	})

@@ -1,0 +1,53 @@
+# Starter golangci-lint configuration with a moderate default set.
+# Strict linters are listed commented out below; enable them per project.
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errname
+    - errorlint
+    - gocritic
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+
+  exclusions:
+    rules:
+      - linters: [all]
+        path: ".*\\.pb\\.go$"
+      - linters: [all]
+        path: ".*_generated\\.go$"
+
+  settings:
+    misspell:
+      locale: US
+    nolintlint:
+      require-specific: true
+    revive:
+      confidence: 0.8
+
+  # Strict linters kept off by default:
+  # - exhaustruct: requires exhaustive struct literals.
+  # - varnamelen: enforces variable-name length thresholds.
+  # - funlen: limits function length.
+  # - gocognit: limits cognitive complexity.
+  # - paralleltest: requires parallel test conventions.
+  # - dupl: flags duplicated code aggressively.
+  # - gocyclo: limits cyclomatic complexity.
+  # - lll: limits source-line length.
+  # - nakedret: limits named-return usage.
+  # - prealloc: suggests allocation changes.
+  # - testpackage: requires external test packages.
+  # - tparallel: requires `t.Parallel` conventions.
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -123,7 +123,6 @@ func TestLoadEnvConfig_Table(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			clearAll(t)
 			for k, v := range tt.env {
@@ -257,7 +256,6 @@ func TestGetTimeoutForEffort(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.effort, func(t *testing.T) {
 			t.Parallel()
 			if got := getTimeoutForEffort(tt.effort); got != tt.want {
@@ -283,7 +281,6 @@ func TestValidateEffort(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
 			t.Parallel()
 			if got := validateEffort(tt.in); got != tt.want {
@@ -306,7 +303,6 @@ func TestValidateVerbosity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
 			t.Parallel()
 			if got := validateVerbosity(tt.in); got != tt.want {
@@ -391,7 +387,6 @@ func TestResolveProvider(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run("in="+tt.in, func(t *testing.T) {
 			t.Parallel()
 			got, err := resolveProvider(tt.in)

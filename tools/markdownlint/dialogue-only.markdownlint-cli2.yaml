@@ -1,0 +1,21 @@
+# Surgical pass: enable ONLY dialogue-paragraph, so --fix cannot rewrite
+# anything else. markdownlint-cli2 reads `config` only when no
+# .markdownlint.{yaml,yml,json,jsonc,cjs,mjs} file sits in the same directory,
+# and config discovery stops at the invocation directory — so run this from a
+# subdirectory of the repo, never from the repo root:
+#
+#   cd some/subdir
+#   markdownlint-cli2 --config ../../tools/markdownlint/dialogue-only.markdownlint-cli2.yaml --fix "*.md"
+# (adjust the relative --config path for the subdirectory's depth)
+#
+# Copy beside dialogue-paragraph.cjs (paths here resolve against this file).
+# Never run any --fix pass on files with uncommitted work.
+customRules:
+  - ./dialogue-paragraph.cjs
+config:
+  default: false
+  dialogue-paragraph:
+    # Same escape hatch as the repo's .markdownlint.yaml: files whose legacy
+    # prose may wrap onto a dash-led line. Globs match the absolute path.
+    ignorePaths:
+      - "**/docs/**"

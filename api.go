@@ -96,7 +96,7 @@ func CallAPI(ctx context.Context, p CallAPIParams) (*apiResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	limitedReader := io.LimitReader(resp.Body, maxResponseBodySize)
 	bodyBytes, err := io.ReadAll(limitedReader)

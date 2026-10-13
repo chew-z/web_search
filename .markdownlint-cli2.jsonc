@@ -1,0 +1,42 @@
+// markdownlint-cli2 SCOPE config — pairs with .markdownlint.yaml.
+//   .markdownlint.yaml       = the RULES (how markdown must look).
+//   .markdownlint-cli2.jsonc = the SCOPE (which files to look at, which custom
+//                              rules to load).
+//
+// One principle: lint AUTHORED documents — written and maintained on purpose;
+// ignore ACCIDENTAL noise — files tooling emits that nobody edits by hand.
+// Test for any path: "if this changed, would someone fix it by hand?" If not,
+// exclude it here under "ignores", never by disabling rules in
+// .markdownlint.yaml (that weakens the check for the authored files too).
+//
+// TEMPLATE from the markdown-authoring skill. Copy to the repo root as
+// .markdownlint-cli2.jsonc and adapt: the entries below are the session
+// artifacts Claude Code commonly drops into .claude/ — a starting point, not
+// a fixed list. Add your project's own noise; drop entries that don't apply.
+// node_modules/** is already ignored by default.
+{
+  // Custom rules are repo-local files: copy this skill's
+  // references/dialogue-paragraph.cjs to tools/markdownlint/ in the repo and
+  // keep it there — the path resolves against this config file's directory.
+  // dialogue-paragraph flags a dialogue replica (a line led by an em or en
+  // dash) that follows a non-blank line, because CommonMark would render the
+  // two as one paragraph; its fix inserts the missing blank line.
+  "customRules": ["./tools/markdownlint/dialogue-paragraph.cjs"],
+  "ignores": [
+    // Conversation/session artifacts — regenerated automatically, never edited.
+    ".claude/compact_backups/**",
+    ".claude/compact_captures/**",
+    ".claude/long-form-summaries/**",
+    ".claude/session_summary.md",
+    // Copied skills — vendored, not authored here. Rules are authored and linted.
+    ".claude/skills/**",
+    ".qoder/skills/**",
+    // Scratch space, and material that has been retired: neither is maintained,
+    // so a finding here is churn rather than a defect. Current reports in
+    // docs/reports/ stay linted — those are authored and worth fixing.
+    "tmp/**",
+    "docs/retired/**"
+    // Add project-specific noise here, for example:
+    // "dist/**", "build/**", "vendor/**", "**/*.generated.md"
+  ]
+}

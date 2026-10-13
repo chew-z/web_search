@@ -2,14 +2,12 @@
 
 go.sum
 bin/**
+coverage.out
 
 .env
 
-*_test.go
-
-AGENTS.md
-GOLANG.md
 GODOC.md
+LSP.md
 
 CONTAINER.md
 container-run.toml
@@ -24,7 +22,12 @@ docs/reports/
 docs/retired/
 tmp/
 
-.claude/
+# Tool folders are ignored except their tracked rules/ folders; Git cannot
+# re-include a path under an excluded directory, so the `/*` form is required.
+.claude/*
+!.claude/rules/
+.qoder/*
+!.qoder/rules/
 .codex/
 .github/
 .vscode/
@@ -37,12 +40,7 @@ tmp/
 # link to global
 .fastembed_cache
 
-# Ephemeral hook-generated files (should not be tracked)
-.claude/session_summary.md
-.claude/compact_backups/
-.claude/deploy_backups/
-
-run_format.sh
-run_lint.sh
-run_test.sh
-run_release.sh
+# Scaffold-owned setup: refreshed by the init script, never hand-edited.
+*.scaffold
+run_*.sh
+.task/

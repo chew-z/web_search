@@ -49,7 +49,7 @@ func extractTokenFromHeader(authHeader string) string {
 //   - Audience: "gemini-mcp-user"
 //   - Leeway:   60 seconds (clock-skew tolerance)
 func validateJWT(secretKey []byte, tokenString string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}

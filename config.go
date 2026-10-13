@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -187,10 +188,8 @@ func validateEffort(effort string) string {
 
 // validateVerbosity ensures the verbosity level is valid, per verbosityLevels.
 func validateVerbosity(verbosity string) string {
-	for _, v := range verbosityLevels {
-		if v == verbosity {
-			return verbosity
-		}
+	if slices.Contains(verbosityLevels, verbosity) {
+		return verbosity
 	}
 	return defaultVerbosity
 }

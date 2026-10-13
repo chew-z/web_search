@@ -1,56 +1,122 @@
-# Taskfile for github.com/chew-z/web_search
-#
-# Centralizes GOEXPERIMENT=jsonv2 in one env block so every go command run
-# through `task` builds the encoding/json/v2 + encoding/json/jsontext imports.
-#
-# IMPORTANT: this env only applies to commands `task` runs. It does NOT reach
-# your editor / gopls (which will flag json/v2 imports as build errors) nor
-# `go install github.com/chew-z/web_search@latest` for external users. See
-# README "JSON v2 / Go toolchain" for the optional per-developer workaround.
-#
-# Requires: go-task (https://taskfile.dev), task v3+.
+# Taskfile is the Answer CLI's task-runner configuration — https://taskfile.dev
+# Install the runner: brew install go-task
+# List available tasks: task --list
 version: "3"
 
-env:
-  GOEXPERIMENT: jsonv2
-
 vars:
-  BIN: bin/answer
+  BINARY: answer
+  BIN_DIR: bin
+  # Use `.` for a single-package main.
+  MAIN_PKG: .
+  BINARY_PATH: "{{.BIN_DIR}}/{{.BINARY}}"
+
+env:
+  # Flip this if the project needs cgo.
+  CGO_ENABLED: "0"
 
 tasks:
   default:
-    desc: List available tasks
+    desc: List all available tasks
     cmds:
       - task --list
     silent: true
 
   build:
-    desc: Build the answer binary
+    desc: Build the binary into bin/
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BINARY_PATH}}"
     cmds:
-      - go build -o {{.BIN}} .
+      - go build -o {{.BINARY_PATH}} {{.MAIN_PKG}}
+
+  run:
+    desc: 'Build and run the CLI (pass args after --, e.g. `task run -- "your query"`)'
+    deps: [build]
+    cmds:
+      - "{{.BINARY_PATH}} {{.CLI_ARGS}}"
 
   test:
-    desc: Run the test suite
+    desc: Run the full test suite with verbose output
+    cmds:
+      - go test -v ./...
+
+  test:short:
+    desc: Run tests without verbose output
     cmds:
       - go test ./...
 
-  lint:
-    desc: Run golangci-lint (with --fix)
+  cover:
+    desc: Run tests with coverage and open the HTML report
     cmds:
-      - golangci-lint run --fix ./...
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out
 
   fmt:
-    desc: Format all Go files
+    desc: Format all Go files with gofmt
     cmds:
       - gofmt -w .
 
-  run:
-    desc: 'Run the CLI (pass args after --, e.g. `task run -- "your query"`)'
+  fmt:check:
+    desc: Fail if any Go file is not gofmt-formatted
     cmds:
-      - go run . {{.CLI_ARGS}}
+      - |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "These files need gofmt:"
+          echo "$unformatted"
+          exit 1
+        fi
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint and auto-fix where possible
+    cmds:
+      - golangci-lint run --fix ./...
+
+  lint:ci:
+    desc: Run golangci-lint without auto-fixing
+    cmds:
+      - golangci-lint run ./...
+
+  lint:md:
+    desc: Lint Markdown, including rule files
+    cmds:
+      - markdownlint-cli2 "**/*.md"
+
+  tidy:
+    desc: Tidy and verify module dependencies
+    cmds:
+      - go mod tidy
+      - go mod verify
+
+  deps:update:
+    desc: Update dependencies, then tidy
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  check:
+    desc: Run the quality gate
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: lint:ci
+      - task: test:short
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f {{.BINARY_PATH}} coverage.out
 
   release:
-    desc: Build a release binary for github.com/chew-z/web_search
+    desc: Build a release binary into bin/
     cmds:
-      - go build -o {{.BIN}} .
-      - 'echo "Built {{.BIN}} for github.com/chew-z/web_search"'
+      - go build -o {{.BINARY_PATH}} {{.MAIN_PKG}}
+      - 'echo "Built {{.BINARY_PATH}}"'

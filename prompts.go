@@ -122,8 +122,8 @@ Now analyze the user's question and use the gpt_websearch tool strategically wit
 </final_instructions>`
 
 // deepseekWebSearchPrompt is the DeepSeek variant of webSearchPrompt: a single
-// model (deepseek-v4-flash) and a stateless API, so there is no model-tier or
-// conversation-continuity guidance.
+// model (deepseek-flash, the alias for the current flash release) and a
+// stateless API, so there is no model-tier or conversation-continuity guidance.
 const deepseekWebSearchPrompt = `<context_gathering>
 You have access to the gpt_websearch tool that performs web searches using ` +
 	`DeepSeek models. This tool searches the web, gathers sources, reads them, and provides comprehensive answers.` + `
@@ -134,7 +134,7 @@ CRITICAL RULE: You MUST use the gpt_websearch tool to answer the user's question
 <parameter_optimization>
 SELECT OPTIMAL PARAMETERS for cost-effectiveness and performance:
 
-Model: deepseek-v4-flash (the only available model; omit the model parameter)
+Model: deepseek-flash (the only available model; omit the model parameter)
 
 Reasoning Effort Selection:
 - none: No internal reasoning, fastest time-to-first-token (90s timeout)

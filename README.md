@@ -1,50 +1,45 @@
 # Answer - Deep-Reasoning Web Search CLI & MCP Server
 
-A Go application that provides intelligent web search capabilities using deep-reasoning models via the Responses API — OpenAI GPT or DeepSeek. Works as both a CLI tool and an MCP (Model Context Protocol) server with cost-effective model selection.
+A Go application that provides intelligent web search capabilities using deep-reasoning models via the Responses API — OpenAI GPT or DeepSeek.
+Works as both a CLI tool and an MCP (Model Context Protocol) server with cost-effective model selection.
 
 ## Features
 
--   🔍 **Intelligent Web Search**: OpenAI GPT (gpt-5.4 family) or DeepSeek (deepseek-v4-flash) with web search capabilities
--   🔀 **Multi-Provider**: Switch backends with `PROVIDER` env or `-provider` flag
--   🎯 **Cost-Effective**: Automatic model selection based on query complexity for optimal cost/performance
--   🚀 **Dual Mode**: CLI tool and MCP server with stdio/HTTP transports
--   ⚙️ **Smart Configuration**: Effort-based timeouts (3/5/10 minutes) and environment-driven setup
--   🧠 **Enhanced MCP Prompts**: Provider-specific prompt templates guide optimal tool usage
--   🔄 **Conversation Continuity**: Response IDs enable follow-up questions with maintained context (OpenAI provider)
--   🔐 **Secure**: Environment-based API key management
+- 🔍 **Intelligent Web Search**: OpenAI GPT (gpt-5.4 family) or DeepSeek (deepseek-flash → DeepSeek-V4.1-Flash) with web search capabilities
+- 🔀 **Multi-Provider**: Switch backends with `PROVIDER` env or `-provider` flag
+- 🎯 **Cost-Effective**: Automatic model selection based on query complexity for optimal cost/performance
+- 🚀 **Dual Mode**: CLI tool and MCP server with stdio/HTTP transports
+- ⚙️ **Smart Configuration**: Effort-based timeouts (3/5/10 minutes) and environment-driven setup
+- 🧠 **Enhanced MCP Prompts**: Provider-specific prompt templates guide optimal tool usage
+- 🔄 **Conversation Continuity**: Response IDs enable follow-up questions with maintained context (OpenAI provider)
+- 🔐 **Secure**: Environment-based API key management
 
 ## Installation
 
 ### Prerequisites
 
--   Go 1.26.0 or later
--   An OpenAI API key (provider `openai`) or a DeepSeek API key (provider `deepseek`)
+- Go 1.27.0 or later
+- An OpenAI API key (provider `openai`) or a DeepSeek API key (provider `deepseek`)
 
-### JSON v2 / Go toolchain
+### JSON v2
 
-This project uses `encoding/json/v2` + `encoding/json/jsontext`, which on Go 1.26
-are gated behind a build experiment. **Every `go` command must run with
-`GOEXPERIMENT=jsonv2`** or the build fails with
-`build constraints exclude all Go files in .../encoding/json/v2`.
+This project uses `encoding/json/v2` + `encoding/json/jsontext`, which are generally
+available as of Go 1.27 — no build experiment, no `GOEXPERIMENT` flag, and nothing
+extra to configure in your editor.
 
-The flag is centralized in `Taskfile.yml` (an `env:` block), so the recommended
-workflow is to use [go-task](https://taskfile.dev):
+Two v2 defaults are worth knowing when reading the wire structs: nil slices and maps
+marshal as `[]` and `{}` rather than `null`, and object names match case-sensitively.
+
+The recommended workflow goes through [go-task](https://taskfile.dev), which defines
+every command in one place:
 
 ```bash
-task build   # go build with GOEXPERIMENT=jsonv2
+go mod download
+task build
 task test
 task lint
 task fmt
 ```
-
-The `run_*.sh` scripts also export the flag. For ad-hoc commands, prefix them:
-`GOEXPERIMENT=jsonv2 go test ./...`.
-
-> **Editor / gopls note:** gopls cannot read the Taskfile env, so it will report
-> json/v2 imports as build errors. Optional per-developer fix (persistent,
-> machine-wide): `go env -w GOEXPERIMENT=jsonv2`. This is **not** required for
-> repo build/test/lint (those go through `task`); it only affects in-editor
-> diagnostics.
 
 ### Build from Source
 
@@ -56,12 +51,12 @@ cd web_search
 # Install dependencies
 go mod download
 
-# Build the binary (flag required — see "JSON v2 / Go toolchain" above)
+# Build the binary
 task build
-# …or: GOEXPERIMENT=jsonv2 go build -o bin/answer .
+# …or: go build -o bin/answer .
 
-# Or install globally (external users must also enable the experiment):
-GOEXPERIMENT=jsonv2 go install github.com/chew-z/web_search@latest
+# Or install globally (the installed binary is named web_search)
+go install github.com/chew-z/web_search@latest
 ```
 
 ## Configuration
@@ -74,7 +69,8 @@ environment variable or the `-provider` flag (flag wins):
 | Provider   | API key env        | Default model    | Notes                                                                     |
 | ---------- | ------------------ | ---------------- | ------------------------------------------------------------------------- |
 | `openai`   | `OPENAI_API_KEY`   | `gpt-5.4-mini`   | Default. Supports conversation continuity (`previous_response_id`).        |
-| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-v4-flash` | Stateless: `previous_response_id`/`prompt_cache_key` are not sent. Web search runs server-side. |
+<!-- markdownlint-disable-next-line MD013 -->
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-flash` | Stateless: `previous_response_id`/`prompt_cache_key` are not sent. Web search runs server-side. `deepseek-flash` is DeepSeek's rolling alias — it resolves to DeepSeek-V4.1-Flash today. |
 
 The base URL, web-search tool type, model defaults, and the MCP guidance
 prompt all adapt to the selected provider; `-base` still overrides the
@@ -88,7 +84,7 @@ Create a `.env` file in the project root:
 OPENAI_API_KEY=your-api-key-here
 PROVIDER=openai          # Optional: openai (default) or deepseek
 DEEPSEEK_API_KEY=        # Required when PROVIDER=deepseek
-MODEL=gpt-5.4-mini       # Optional: provider default (gpt-5.4-mini / deepseek-v4-flash)
+MODEL=gpt-5.4-mini       # Optional: provider default (gpt-5.4-mini / deepseek-flash)
 EFFORT=low               # Optional: reasoning effort (low/medium/high, default: medium)
 SHOW_ALL=false           # Optional: show raw JSON
 QUESTION=                # Optional: default question
@@ -96,12 +92,13 @@ QUESTION=                # Optional: default question
 
 **Model Selection Guidelines** (OpenAI provider):
 
--   `gpt-5.4-nano`: Simple facts, definitions, quick lookups
--   `gpt-5.4-mini`: Research tasks, comparisons, specific topics
--   `gpt-5.4`: Complex analysis, coding questions, reasoning tasks
+- `gpt-5.4-nano`: Simple facts, definitions, quick lookups
+- `gpt-5.4-mini`: Research tasks, comparisons, specific topics
+- `gpt-5.4`: Complex analysis, coding questions, reasoning tasks
 
-DeepSeek provider currently offers a single model, `deepseek-v4-flash`
-(`deepseek-v4-pro` pending); tune `EFFORT` instead of the model.
+DeepSeek provider currently offers a single model, `deepseek-flash` — the
+version-less alias that DeepSeek repoints at each new flash release
+(DeepSeek-V4.1-Flash at the time of writing); tune `EFFORT` instead of the model.
 
 **Effort-Based Timeouts**: `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes.
 Tip: Use `low` for quicker answers when speed matters.
@@ -182,10 +179,10 @@ To use DeepSeek instead, add `"PROVIDER": "deepseek"` and set `DEEPSEEK_API_KEY`
 
 **Endpoints:**
 
--   `GET /` - API documentation
--   `GET /health` - Health check
+- `GET /` - API documentation
+- `GET /health` - Health check
 
--   `POST /message` - Message handling endpoint
+- `POST /message` - Message handling endpoint
 
 **Note:** `POST /message` is for sending requests to the MCP server (JSON-RPC 2.0 payload).
 
@@ -198,10 +195,10 @@ Performs intelligent web searches with cost-effective model selection and (OpenA
 | Parameter              | Type    | Required | Default              | Description                                                                       |
 | ---------------------- | ------- | -------- | -------------------- | --------------------------------------------------------------------------------- |
 | `query`                | string  | Yes      | -                    | The search query or question                                                      |
-| `model`                | string  | No       | provider default     | `gpt-5.4-mini` (openai) or `deepseek-v4-flash` (deepseek)                         |
+| `model`                | string  | No       | provider default     | `gpt-5.4-mini` (openai) or `deepseek-flash` (deepseek)                            |
 | `reasoning_effort`     | string  | No       | `medium`             | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
 | `verbosity`            | string  | No       | `medium`             | Response verbosity: `low`, `medium`, or `high`                                    |
-| `previous_response_id` | string  | No       | -                    | Previous response ID for conversation continuity (openai only; param absent for deepseek) |
+| `previous_response_id` | string  | No       | -                  | Previous response ID for conversation continuity (openai only; param absent for deepseek) |
 | `prompt_cache_key`     | string  | No       | server default       | OpenAI prompt cache shard (openai only; param absent for deepseek)                |
 | `web_search`           | boolean | No       | `true`               | Use web search (default: true)                                                    |
 
@@ -209,11 +206,11 @@ Performs intelligent web searches with cost-effective model selection and (OpenA
 
 Enhanced prompt template that guides Claude Desktop to:
 
--   Analyze user questions in conversation context
--   Select cost-effective models based on complexity
--   Choose appropriate reasoning effort levels
--   Use single, sequential, or parallel search strategies
--   Remember and use response IDs for conversation continuity
+- Analyze user questions in conversation context
+- Select cost-effective models based on complexity
+- Choose appropriate reasoning effort levels
+- Use single, sequential, or parallel search strategies
+- Remember and use response IDs for conversation continuity
 
 ### Example Response
 
@@ -279,13 +276,13 @@ The AI assistant will automatically remember context from the previous search an
 
 ### CLI Mode
 
-```
+```text
 answer [options] [question]
 
 Options:
   -q, -question    Question to ask (required, can also use positional argument)
   -provider       API provider: openai (default) or deepseek (env PROVIDER)
-  -model          Model (default: gpt-5.4-mini for openai, deepseek-v4-flash for deepseek; env MODEL)
+  -model          Model (default: gpt-5.4-mini for openai, deepseek-flash for deepseek; env MODEL)
   -effort         Reasoning effort: none (90s), low (3min), medium (5min), high (10min), xhigh (15min timeout) (default: medium)
   -verbosity      Response verbosity: low, medium, high (default: medium)
   -timeout        Request timeout (overrides effort-based defaults)
@@ -297,7 +294,7 @@ Options:
 
 ### MCP Server Mode
 
-```
+```text
 answer mcp [options]
 
 Options:
@@ -334,7 +331,7 @@ Options:
 
 ### Project Structure
 
-```
+```text
 Answer/
 ├── main.go              # Main entry point with CLI and MCP modes
 ├── api.go               # Responses API client and answer extraction

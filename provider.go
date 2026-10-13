@@ -9,8 +9,11 @@ const (
 	defaultProvider  = providerOpenAI
 
 	// DeepSeek endpoints and models (Responses API).
+	// modelDeepSeekFlash is the version-less alias DeepSeek repoints at each new
+	// flash release (currently DeepSeek-V4.1-Flash), so it never goes stale.
+	// See https://api.deepseek.com/models for what it resolves to today.
 	deepseekBaseURL    = "https://api.deepseek.com/responses"
-	modelDeepSeekFlash = "deepseek-v4-flash"
+	modelDeepSeekFlash = "deepseek-flash"
 )
 
 // provider describes an upstream Responses API backend. The registry is the
@@ -46,7 +49,7 @@ var providerRegistry = map[string]provider{
 		DefaultModel:       modelDeepSeekFlash,
 		SupportsContinuity: false,
 		Models: []modelInfo{
-			{modelDeepSeekFlash, "Deep reasoning with server-side web search (deepseek-v4-pro coming soon)", "medium"},
+			{modelDeepSeekFlash, "Latest DeepSeek flash model with server-side web search", "medium"},
 		},
 		Prompt: deepseekWebSearchPrompt,
 	},
