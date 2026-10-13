@@ -5,7 +5,7 @@ package main
 // DeepSeek Responses API probe. Excluded from normal test runs via build tag.
 // Run explicitly with:
 //
-//	GOEXPERIMENT=jsonv2 DEEPSEEK_API_KEY=sk-... \
+//	DEEPSEEK_API_KEY=sk-... \
 //	  go test -tags deepseek -run TestDeepSeek -v -timeout 30m .
 
 import (
@@ -82,7 +82,7 @@ func dsParams(key, model, effort string, useWebSearch bool) CallAPIParams {
 // Probe 1: basic non-streaming call through the production CallAPI path.
 // Verifies response shape (id, message items, output_text) with ExtractAnswer.
 func TestDeepSeekBasic(t *testing.T) {
-	resp, err := CallAPI(context.Background(), dsParams(dsKey(t), "deepseek-v4-flash", "medium", false))
+	resp, err := CallAPI(context.Background(), dsParams(dsKey(t), "deepseek-flash", "medium", false))
 	if err != nil {
 		t.Fatalf("basic call failed: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestDeepSeekBasic(t *testing.T) {
 func TestDeepSeekWebSearch(t *testing.T) {
 	key := dsKey(t)
 	body := requestBody{
-		Model:     "deepseek-v4-flash",
+		Model:     "deepseek-flash",
 		Input:     "What major world news happened in the last 48 hours? Give two examples with dates.",
 		Reasoning: reqReasoning{Effort: "medium"},
 		Text:      reqText{Verbosity: "medium"},
@@ -128,10 +128,12 @@ func TestDeepSeekWebSearch(t *testing.T) {
 	t.Error("no web_search_call item in output — search may not have executed")
 }
 
-// Probe 3: our current tool type (web_search_preview) against DeepSeek.
+// Probe 3: the retired OpenAI-era web_search_preview tool name against DeepSeek.
 // Docs say unknown tool types are silently ignored — verify no error, no search.
 func TestDeepSeekOpenAIToolTypeIgnored(t *testing.T) {
-	resp, err := CallAPI(context.Background(), dsParams(dsKey(t), "deepseek-v4-flash", "low", true))
+	p := dsParams(dsKey(t), "deepseek-flash", "low", true)
+	p.WebSearchTool = "web_search_preview" // deliberately the retired OpenAI name
+	resp, err := CallAPI(context.Background(), p)
 	if err != nil {
 		t.Fatalf("call with web_search_preview failed (expected silent ignore): %v", err)
 	}
@@ -149,7 +151,7 @@ func TestDeepSeekEffortEnum(t *testing.T) {
 	key := dsKey(t)
 	for _, effort := range []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"} {
 		t.Run(effort, func(t *testing.T) {
-			p := dsParams(key, "deepseek-v4-flash", effort, false)
+			p := dsParams(key, "deepseek-flash", effort, false)
 			p.Query = "Reply with just the word: ok"
 			p.Timeout = 2 * time.Minute
 			resp, err := CallAPI(context.Background(), p)
@@ -164,7 +166,7 @@ func TestDeepSeekEffortEnum(t *testing.T) {
 
 // Probe 5: unsupported fields silently ignored per docs.
 func TestDeepSeekUnsupportedFieldsIgnored(t *testing.T) {
-	p := dsParams(dsKey(t), "deepseek-v4-flash", "low", false)
+	p := dsParams(dsKey(t), "deepseek-flash", "low", false)
 	p.Query = "Reply with just the word: ok"
 	p.PreviousResponseID = "resp_nonexistent_probe"
 	p.PromptCacheKey = "answer-probe"
@@ -175,24 +177,13 @@ func TestDeepSeekUnsupportedFieldsIgnored(t *testing.T) {
 	t.Logf("id=%s answer=%q", resp.ID, truncate(ExtractAnswer(resp), 80))
 }
 
-// Probe 6: deepseek-v4-pro availability (docs said "early August 2026").
-func TestDeepSeekProModel(t *testing.T) {
-	p := dsParams(dsKey(t), "deepseek-v4-pro", "medium", false)
-	p.Query = "Reply with just the word: ok"
-	resp, err := CallAPI(context.Background(), p)
-	if err != nil {
-		t.Skipf("deepseek-v4-pro not available yet: %v", err)
-	}
-	t.Logf("pro available: id=%s model=%s", resp.ID, resp.Model)
-}
-
-// Probe 7: dump the output item structure for a search query. Determines
+// Probe 6: dump the output item structure for a search query. Determines
 // whether search-process narration arrives as separate message items
 // (which ExtractAnswer currently concatenates into the answer).
 func TestDeepSeekOutputItemStructure(t *testing.T) {
 	key := dsKey(t)
 	body := requestBody{
-		Model:     "deepseek-v4-flash",
+		Model:     "deepseek-flash",
 		Input:     "What major world news happened in the last 48 hours? Give two examples with dates.",
 		Reasoning: reqReasoning{Effort: "medium"},
 		Text:      reqText{Verbosity: "medium"},

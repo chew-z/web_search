@@ -35,7 +35,7 @@ var providerRegistry = map[string]provider{
 		Name:               providerOpenAI,
 		KeyEnv:             "OPENAI_API_KEY",
 		DefaultBaseURL:     defaultBaseURL,
-		WebSearchTool:      "web_search_preview",
+		WebSearchTool:      "web_search",
 		DefaultModel:       defaultModel,
 		SupportsContinuity: true,
 		Models:             modelRegistry,

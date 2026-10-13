@@ -7,7 +7,7 @@
 - **Multi-Provider Support**: Choose between OpenAI (`openai`, default) and DeepSeek (`deepseek`)
   backends via the `PROVIDER` environment variable or the `-provider` flag (CLI and MCP modes).
   Each provider brings its own endpoint, API key env var (`OPENAI_API_KEY` / `DEEPSEEK_API_KEY`),
-  web-search tool type, default model (`gpt-5.4-mini` / `deepseek-v4-flash`), and MCP guidance prompt.
+  web-search tool type, default model (`gpt-6-luna` / `deepseek-flash`), and MCP guidance prompt.
   Provider registry lives in `provider.go`.
 - **Reasoning Effort Levels**: Effort selection expanded to `none`, `low`, `medium`, `high`, `xhigh` with matching timeout defaults (90s/3/5/10/15 min).
 

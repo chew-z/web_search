@@ -23,14 +23,13 @@ tags: [open-items]
   Owner: project owner.
 - **Which changelog is canonical?** `CHANGELOG.md` and `Release Notes.md` restate the same
   release history, both still list the multi-provider work as "Unreleased", and the
-  version in code is pinned at `0.3.5` (config.go:26). Both also still name the DeepSeek
-  model `deepseek-v4-flash` (CHANGELOG.md:10, `Release Notes.md`:11) where the code now
-  ships the rolling alias `deepseek-flash` (provider.go:16). Pick one file to maintain, or
-  describe the release process in a rule. Owner: project owner.
+  version in code is pinned at `0.3.5` (config.go:24).
+  Pick one file to maintain, or describe the release process in a rule.
+  Owner: project owner.
 - **Two proposed rules are waiting on a yes or no.** Both were drafted but deliberately not
   written — rules are only added on approval — so say the word and they land.
   - `release.md`, scoped to `CHANGELOG.md`, `Release Notes.md`, and `config.go`: the version
-    lives in `serverVersion` (config.go:26) and in the changelog heading, both of which have
+    lives in `serverVersion` (config.go:24) and in the changelog heading, both of which have
     to move together; five GitHub releases exist (v0.1.0 … v0.3.5, tag plus notes, no binary
     asset) with no documented procedure, and the one script that claims to do it is stale.
   - `commits.md`, scoped to `**`: Conventional Commits, which every commit in the log
@@ -49,11 +48,7 @@ tags: [open-items]
 
 ## Debt
 
-- **2026-10-13 — three test files are untracked.** `auth_test.go`, `logging_test.go`, and
-  `deepseek_probe_test.go` were never committed because `.gitignore` carried a `*_test.go`
-  rule that silently excluded every test file added after the initial commit. The rule is
-  removed; the three files still need `git add` in a commit of their own.
-- **2026-10-13 — `MCPConfigParams` duplicates `MCPConfig` field-for-field** (config.go:98,
-  config.go:200). Intentional today; worth collapsing if a third field ever needs adding.
+- **2026-10-13 — `MCPConfigParams` duplicates `MCPConfig` field-for-field** (config.go:96,
+  config.go:198). Intentional today; worth collapsing if a third field ever needs adding.
 - **2026-10-13 — no tagged release since v0.3.5 (2025-12-08)** while the code has moved
   through multi-provider support, json/v2 migration, and mcp-go v0.56.0.

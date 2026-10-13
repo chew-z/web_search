@@ -10,12 +10,10 @@ import (
 
 const (
 	// Default values
-	defaultModel = "gpt-5.4-mini"
+	defaultModel = modelLuna
 
 	// Named model constants
-	modelNano        = "gpt-5.4-nano"
-	modelMini        = "gpt-5.4-mini"
-	modelFull        = "gpt-5.4"
+	modelLuna        = "gpt-6-luna"
 	defaultEffort    = "medium"
 	defaultVerbosity = "medium"
 	defaultBaseURL   = "https://api.openai.com/v1/responses"
@@ -27,7 +25,7 @@ const (
 	serverWebsiteURL = "https://github.com/chew-z/web_search"
 
 	// Timeouts based on reasoning effort.
-	// Enum mirrors what gpt-5.4-* / gpt-5.5 accept:
+	// Enum mirrors what gpt-6-luna accepts:
 	// none, low, medium, high, xhigh. "none" disables reasoning entirely;
 	// "xhigh" requests the deepest reasoning chain available.
 	timeoutNone   = 90 * time.Second
@@ -175,8 +173,8 @@ func getTimeoutForEffort(effort string) time.Duration {
 	return timeoutLow
 }
 
-// validateEffort ensures the effort level is valid for the gpt-5.4-* / gpt-5.5
-// family this server targets. The legacy "minimal" value (4o/4.1 only) is no
+// validateEffort ensures the effort level is valid for gpt-6-luna:
+// none, low, medium, high, xhigh. The legacy "minimal" value (4o/4.1 only) is no
 // longer accepted. Valid values come from effortRegistry; anything else
 // (including empty) falls back to defaultEffort.
 func validateEffort(effort string) string {

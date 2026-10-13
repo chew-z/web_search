@@ -38,9 +38,17 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   serves the HTTP transport behind a reverse proxy at `karma.rrj.pl/answer/mcp`
   (`.mcp.json`), with `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` left at its default.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
-  version string in code is still `0.3.5` (config.go:26). No release since.
+  version string in code is still `0.3.5` (config.go:24). No release since.
 
 ## Recent changes
+
+### 2026-10-13 — model configuration refresh
+
+- OpenAI collapsed to the single model `gpt-6-luna`, replacing the `gpt-5.4-nano` / `gpt-5.4-mini` / `gpt-5.4` ladder.
+- `gpt-5.4-nano` is deprecated with an April 1, 2027 shutdown.
+- The OpenAI Responses API web search tool type moved from `web_search_preview` to `web_search` to match the model's documented tool list.
+- The retired `deepseek-v4-flash` alias was replaced by the rolling alias `deepseek-flash` throughout the docs and the DeepSeek probe file.
+- The `deepseek-v4-pro` probe was dropped.
 
 ### 2026-10-13 — re-initialized from the Go scaffold, modernized to Go 1.27
 

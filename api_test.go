@@ -88,7 +88,7 @@ func TestCallAPI_Success_WebSearchTrue_VerifyMethodPathAndBody(t *testing.T) {
 		if reqBody.PromptCacheKey != "test-cache-key" {
 			t.Errorf("expected prompt_cache_key 'test-cache-key', got %s", reqBody.PromptCacheKey)
 		}
-		if len(reqBody.Tools) != 1 || reqBody.Tools[0].Type != "web_search_preview" {
+		if len(reqBody.Tools) != 1 || reqBody.Tools[0].Type != "web_search" {
 			t.Errorf("expected web search tool, got %+v", reqBody.Tools)
 		}
 
@@ -601,7 +601,7 @@ func TestHandleWebSearch_EmptyAnswer(t *testing.T) {
 
 	result, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
 		Query: "test query",
-		Model: "gpt-5.4-mini",
+		Model: defaultModel,
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -637,7 +637,7 @@ func TestHandleWebSearch_Success(t *testing.T) {
 
 	result, err := HandleWebSearch(ctx, os.Getenv("OPENAI_API_KEY"), "http://example.invalid", WebSearchParams{
 		Query:              "test query",
-		Model:              "gpt-5.4-mini",
+		Model:              defaultModel,
 		Effort:             "high",
 		Verbosity:          "high",
 		PreviousResponseID: "prev-id",

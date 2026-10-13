@@ -421,7 +421,7 @@ func TestGptWebsearch_OutputSchemaValidation_PassesForValidResult(t *testing.T) 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		respBody := map[string]any{
 			"id":    "resp_test_1",
-			"model": modelMini,
+			"model": modelLuna,
 			"reasoning": map[string]any{
 				"effort": "medium",
 			},
@@ -477,7 +477,7 @@ func TestGptWebsearch_OutputSchemaValidation_PassesForValidResult(t *testing.T) 
 // must keep web_search=true when the caller omits it. If someone swaps the
 // struct population for BindArguments (a defaults-free JSON round-trip), the
 // field silently becomes false — this test catches that both upstream (the
-// web_search_preview tool is sent) and in the structured output.
+// web_search tool is sent) and in the structured output.
 func TestGptWebsearch_OmittedWebSearch_DefaultsTrue(t *testing.T) {
 	t.Parallel()
 
@@ -485,12 +485,12 @@ func TestGptWebsearch_OmittedWebSearch_DefaultsTrue(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var reqBody requestBody
 		_ = json.UnmarshalRead(r.Body, &reqBody)
-		if len(reqBody.Tools) == 1 && reqBody.Tools[0].Type == "web_search_preview" {
+		if len(reqBody.Tools) == 1 && reqBody.Tools[0].Type == "web_search" {
 			sawTool.Store(true)
 		}
 		respBody := map[string]any{
 			"id":        "resp_default_ws",
-			"model":     modelMini,
+			"model":     modelLuna,
 			"reasoning": map[string]any{"effort": "medium"},
 			"output": []any{
 				map[string]any{
@@ -526,7 +526,7 @@ func TestGptWebsearch_OmittedWebSearch_DefaultsTrue(t *testing.T) {
 		t.Errorf("web_search_used: got %v, want true (omitted should default true)", sc["web_search_used"])
 	}
 	if !sawTool.Load() {
-		t.Errorf("upstream did not receive web_search_preview tool; web_search defaulted false")
+		t.Errorf("upstream did not receive web_search tool; web_search defaulted false")
 	}
 }
 
@@ -648,15 +648,13 @@ func TestMCPServer_ModelsListResource(t *testing.T) {
 	if !ok {
 		t.Fatalf("models payload missing models array: %v", payload["models"])
 	}
-	if len(modelsRaw) != 3 {
-		t.Fatalf("models payload should include 3 models, got %d: %v", len(modelsRaw), modelsRaw)
+	if len(modelsRaw) != 1 {
+		t.Fatalf("models payload should include 1 model, got %d: %v", len(modelsRaw), modelsRaw)
 	}
 
 	requireFields := []string{"name", "description", "recommended_effort", "timeout"}
 	names := map[string]struct{}{
-		modelNano: {},
-		modelMini: {},
-		modelFull: {},
+		modelLuna: {},
 	}
 	seen := make(map[string]struct{}, len(modelsRaw))
 	for _, raw := range modelsRaw {

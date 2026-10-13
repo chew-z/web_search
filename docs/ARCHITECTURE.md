@@ -15,7 +15,7 @@ tags: [architecture]
 `web_search` (built as `bin/answer`) wraps the OpenAI-style Responses API to give a caller a web-searching deep-reasoning model.
 It has two front ends over one core:
 a one-shot CLI (`answer -q "..."`) and an MCP server (`answer mcp`) that exposes a `gpt_websearch` tool to MCP clients such as Claude Code and Claude Desktop.
-The upstream is one of two providers — OpenAI's `gpt-5.4` family or DeepSeek — chosen by flag or environment variable.
+The upstream is one of two providers — OpenAI's `gpt-6-luna` or DeepSeek — chosen by flag or environment variable.
 
 The only outbound network call is a POST to the selected provider's `/responses` endpoint, built at api.go:88 and sent at api.go:95.
 Responses are capped at 10 MB (api.go:18).
@@ -29,9 +29,9 @@ Everything is `package main` at the repository root; the split below is by conce
 | `main.go` | CLI + MCP entry | `main` routes on `os.Args[1] == "mcp"` (main.go:19); `runCLI`, CLI flags; `runMCPMode`, `runTransport`, `requireAuthSecret`. |
 | `api.go` | shared | `CallAPI` (api.go:56), the one outbound HTTP call; `ExtractAnswer` (api.go:166); `HandleWebSearch` (api.go:223). |
 | `provider.go` | shared | The `provider` struct (provider.go:22) and `providerRegistry` (provider.go:33); lookups at provider.go:66, provider.go:80. |
-| `config.go` | shared | Constants and wire structs; `loadEnvConfig` (config.go:127), `validateEffort` (config.go:182), `parseMCPConfig` (config.go:218). |
+| `config.go` | shared | Constants and wire structs; `loadEnvConfig` (config.go:125), `validateEffort` (config.go:180), `parseMCPConfig` (config.go:216). |
 | `models.go` | shared | `effortRegistry` (models.go:20), `verbosityLevels` (models.go:29), `modelRegistry` (models.go:83), plus the schema helpers. |
-| `prompts.go` | MCP only | The two guidance prompts: `webSearchPrompt` (prompts.go:4) and `deepseekWebSearchPrompt` (prompts.go:127). |
+| `prompts.go` | MCP only | The two guidance prompts: `webSearchPrompt` (prompts.go:4) and `deepseekWebSearchPrompt` (prompts.go:124). |
 | `mcp_server.go` | MCP only | `NewMCPServer` (mcp_server.go:26), the tool/resource/prompt registrations and handlers, `logToClient`. |
 | `transport.go` | MCP only | `RunStdioTransport` (transport.go:19), `RunHTTPTransport` (transport.go:40), HTTP server timeouts. |
 | `auth.go` | MCP HTTP only | `validateJWT` (auth.go:51), `newAuthHTTPMiddleware` (auth.go:78), `getUserInfo` (auth.go:132). |
@@ -42,12 +42,12 @@ Everything is `package main` at the repository root; the split below is by conce
 
 ### CLI
 
-1. `runCLI` (main.go:239) does an advisory `loadEnvConfig("")` (main.go:244) purely to seed
+1. `runCLI` (main.go:238) does an advisory `loadEnvConfig("")` (main.go:243) purely to seed
    flag defaults, ignoring its error.
 2. `parseCLIArgs` (main.go:169) defines the flags, calls `flag.Parse`, and resolves the
    question from `-q`, `-question`, or the positional argument (main.go:219).
 3. Effort and verbosity are normalised to `medium` when unrecognised
-   (main.go:199, config.go:182, config.go:190).
+   (main.go:199, config.go:180, config.go:188).
 4. Timeout precedence: the `-timeout` flag, else `TIMEOUT`, else
    `getTimeoutForEffort(effort)` (main.go:201).
 5. The authoritative `loadEnvConfig(args.provider)` (main.go:248) validates the provider and
@@ -67,8 +67,8 @@ Everything is `package main` at the repository root; the split below is by conce
    (main.go:64).
 2. Provider and API key come from `loadEnvConfig` (main.go:72); the JWT secret from
    `requireAuthSecret` (main.go:79).
-3. `parseMCPConfig` (config.go:218) fills the remaining defaults, then `NewMCPServer`
-   (main.go:105) builds the server and `runTransport` (main.go:113) starts it.
+3. `parseMCPConfig` (config.go:216) fills the remaining defaults, then `NewMCPServer`
+   (main.go:104) builds the server and `runTransport` (main.go:113) starts it.
 
 Per tool call: `webSearchHandler` (mcp_server.go:137) → `HandleWebSearch` (api.go:223) →
 `CallAPI` → `ExtractAnswer` → a `WebSearchResult` returned as structured-only content
@@ -87,7 +87,7 @@ The registry (provider.go:33) is the single place a backend is described.
 
 | Provider | API key env | Base URL | Web-search tool | Default model | Continuity |
 | --- | --- | --- | --- | --- | --- |
-| `openai` (default) | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `web_search_preview` | `gpt-5.4-mini` | yes |
+| `openai` (default) | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `web_search` | `gpt-6-luna` | yes |
 | `deepseek` | `DEEPSEEK_API_KEY` | `https://api.deepseek.com/responses` | `web_search` | `deepseek-flash` | no |
 
 `SupportsContinuity` gates three things: computing a prompt cache key (main.go:263,
@@ -98,7 +98,7 @@ parameters in the tool schema at all (mcp_server.go:110).
 
 ## MCP surface
 
-Server name `gpt-websearch-mcp`, version `0.3.5` (config.go:24, config.go:26), with logging, tools,
+Server name `gpt-websearch-mcp`, version `0.3.5` (config.go:22, config.go:24), with logging, tools,
 resources, prompts, recovery, and input/output schema validation enabled (mcp_server.go:28).
 
 - **Tool `gpt_websearch`** (registered mcp_server.go:45, defined mcp_server.go:88).
@@ -145,16 +145,16 @@ import (main.go:13).
 
 | Variable | Read for | Mode | Default |
 | --- | --- | --- | --- |
-| `PROVIDER` | `openai` or `deepseek` (config.go:129) | both | `openai` |
-| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | the active provider's key (config.go:157) | both | required |
-| `QUESTION` | default for `-q` (config.go:138) | CLI | — |
-| `MODEL` | default for `-model` (config.go:139) | CLI | provider model |
-| `EFFORT` | default for `-effort` (config.go:140) | CLI | `medium` |
-| `SHOW_ALL` | default for `-show-all` (config.go:143) | CLI | `false` |
-| `TIMEOUT` | default for `-timeout` (config.go:150) | CLI | effort-derived |
-| `PROMPT_CACHE_KEY` | default for `-cache-key` (main.go:191) | CLI | — |
+| `PROVIDER` | `openai` or `deepseek` (config.go:128) | both | `openai` |
+| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | the active provider's key (config.go:156) | both | required |
+| `QUESTION` | default for `-q` (config.go:137) | CLI | — |
+| `MODEL` | default for `-model` (config.go:138) | CLI | provider model |
+| `EFFORT` | default for `-effort` (config.go:139) | CLI | `medium` |
+| `SHOW_ALL` | default for `-show-all` (config.go:142) | CLI | `false` |
+| `TIMEOUT` | default for `-timeout` (config.go:149) | CLI | effort-derived |
+| `PROMPT_CACHE_KEY` | default for `-cache-key` (main.go:190) | CLI | — |
 | `GEMINI_AUTH_SECRET_KEY` | HTTP JWT secret (main.go:134) | MCP | required with `-auth-enabled` |
-| `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | DNS-rebinding protection (main.go:87) | MCP | `true` (protection off) |
+| `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | DNS-rebinding protection (main.go:86) | MCP | `true` (protection off) |
 
 MCP mode ignores `MODEL`, `EFFORT`, `TIMEOUT`, `QUESTION`, `SHOW_ALL`, and
 `PROMPT_CACHE_KEY` — they are read only by the CLI path.
@@ -169,7 +169,7 @@ are defined in `parseCLIArgs` (main.go:169).
 ### MCP flags
 
 `-t` / `-transport`, `-port`, `-host`, `-base`, `-provider`, `-verbose`, `-auth-enabled`,
-and `-heartbeat` (main.go:37).
+and `-heartbeat` (main.go:36).
 
 ### Effort and timeout
 
@@ -181,8 +181,8 @@ and `-heartbeat` (main.go:37).
 | `high` | 10m | |
 | `xhigh` | 15m | matches the HTTP server write timeout |
 
-An unrecognised effort deliberately resolves to the `low` timeout (config.go:174) but to
-the `medium` label (config.go:185); the asymmetry is documented at config.go:165.
+An unrecognised effort deliberately resolves to the `low` timeout (config.go:173) but to
+the `medium` label (config.go:184); the asymmetry is documented at config.go:165.
 
 ### Precedence
 

@@ -1,15 +1,15 @@
 # Answer - Deep-Reasoning Web Search CLI & MCP Server
 
 A Go application that provides intelligent web search capabilities using deep-reasoning models via the Responses API — OpenAI GPT or DeepSeek.
-Works as both a CLI tool and an MCP (Model Context Protocol) server with cost-effective model selection.
+Works as both a CLI tool and an MCP (Model Context Protocol) server with configurable reasoning effort.
 
 ## Features
 
-- 🔍 **Intelligent Web Search**: OpenAI GPT (gpt-5.4 family) or DeepSeek (deepseek-flash → DeepSeek-V4.1-Flash) with web search capabilities
+- 🔍 **Intelligent Web Search**: OpenAI GPT (gpt-6-luna) or DeepSeek (deepseek-flash → DeepSeek-V4.1-Flash) with web search capabilities
 - 🔀 **Multi-Provider**: Switch backends with `PROVIDER` env or `-provider` flag
-- 🎯 **Cost-Effective**: Automatic model selection based on query complexity for optimal cost/performance
+- 🎯 **Cost-Effective**: Configurable reasoning effort based on query complexity for optimal cost/performance
 - 🚀 **Dual Mode**: CLI tool and MCP server with stdio/HTTP transports
-- ⚙️ **Smart Configuration**: Effort-based timeouts (3/5/10 minutes) and environment-driven setup
+- ⚙️ **Smart Configuration**: Effort-based timeouts (90s/3/5/10/15 minutes) and environment-driven setup
 - 🧠 **Enhanced MCP Prompts**: Provider-specific prompt templates guide optimal tool usage
 - 🔄 **Conversation Continuity**: Response IDs enable follow-up questions with maintained context (OpenAI provider)
 - 🔐 **Secure**: Environment-based API key management
@@ -68,7 +68,7 @@ environment variable or the `-provider` flag (flag wins):
 
 | Provider   | API key env        | Default model    | Notes                                                                     |
 | ---------- | ------------------ | ---------------- | ------------------------------------------------------------------------- |
-| `openai`   | `OPENAI_API_KEY`   | `gpt-5.4-mini`   | Default. Supports conversation continuity (`previous_response_id`).        |
+| `openai`   | `OPENAI_API_KEY`   | `gpt-6-luna`     | Default. Supports conversation continuity (`previous_response_id`).        |
 <!-- markdownlint-disable-next-line MD013 -->
 | `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-flash` | Stateless: `previous_response_id`/`prompt_cache_key` are not sent. Web search runs server-side. `deepseek-flash` is DeepSeek's rolling alias — it resolves to DeepSeek-V4.1-Flash today. |
 
@@ -84,23 +84,21 @@ Create a `.env` file in the project root:
 OPENAI_API_KEY=your-api-key-here
 PROVIDER=openai          # Optional: openai (default) or deepseek
 DEEPSEEK_API_KEY=        # Required when PROVIDER=deepseek
-MODEL=gpt-5.4-mini       # Optional: provider default (gpt-5.4-mini / deepseek-flash)
+MODEL=gpt-6-luna         # Optional: provider default (gpt-6-luna / deepseek-flash)
 EFFORT=low               # Optional: reasoning effort (low/medium/high, default: medium)
 SHOW_ALL=false           # Optional: show raw JSON
 QUESTION=                # Optional: default question
 ```
 
-**Model Selection Guidelines** (OpenAI provider):
+**Available Model** (OpenAI provider):
 
-- `gpt-5.4-nano`: Simple facts, definitions, quick lookups
-- `gpt-5.4-mini`: Research tasks, comparisons, specific topics
-- `gpt-5.4`: Complex analysis, coding questions, reasoning tasks
+- `gpt-6-luna`: Factual lookups, research, comparisons, complex analysis, coding questions, and reasoning tasks
 
 DeepSeek provider currently offers a single model, `deepseek-flash` — the
 version-less alias that DeepSeek repoints at each new flash release
 (DeepSeek-V4.1-Flash at the time of writing); tune `EFFORT` instead of the model.
 
-**Effort-Based Timeouts**: `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes.
+**Effort-Based Timeouts**: `none` = 90 seconds, `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes, `xhigh` = 15 minutes.
 Tip: Use `low` for quicker answers when speed matters.
 
 ## Usage
@@ -120,7 +118,7 @@ Use Answer as a command-line tool for direct web searches:
 ./bin/answer  # Error: please provide a question to ask
 
 # With custom model and effort
-./bin/answer -q "Explain quantum computing" -model gpt-5.4-mini -effort high
+./bin/answer -q "Explain quantum computing" -model gpt-6-luna -effort high
 
 # Show raw JSON response
 ./bin/answer -q "Test query" -show-all
@@ -190,13 +188,14 @@ To use DeepSeek instead, add `"PROVIDER": "deepseek"` and set `DEEPSEEK_API_KEY`
 
 ### Tool: `gpt_websearch`
 
-Performs intelligent web searches with cost-effective model selection and (OpenAI provider) conversation continuity:
+Performs intelligent web searches with configurable reasoning effort and (OpenAI provider) conversation continuity:
 
 | Parameter              | Type    | Required | Default              | Description                                                                       |
 | ---------------------- | ------- | -------- | -------------------- | --------------------------------------------------------------------------------- |
 | `query`                | string  | Yes      | -                    | The search query or question                                                      |
-| `model`                | string  | No       | provider default     | `gpt-5.4-mini` (openai) or `deepseek-flash` (deepseek)                            |
-| `reasoning_effort`     | string  | No       | `medium`             | Effort level:<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes |
+| `model`                | string  | No       | provider default     | `gpt-6-luna` (openai) or `deepseek-flash` (deepseek)                               |
+<!-- markdownlint-disable-next-line MD013 -->
+| `reasoning_effort`     | string  | No       | `medium`             | Effort level:<br>`none` = 90 seconds<br>`low` = 3 minutes<br>`medium` = 5 minutes<br>`high` = 10 minutes<br>`xhigh` = 15 minutes |
 | `verbosity`            | string  | No       | `medium`             | Response verbosity: `low`, `medium`, or `high`                                    |
 | `previous_response_id` | string  | No       | -                  | Previous response ID for conversation continuity (openai only; param absent for deepseek) |
 | `prompt_cache_key`     | string  | No       | server default       | OpenAI prompt cache shard (openai only; param absent for deepseek)                |
@@ -207,7 +206,7 @@ Performs intelligent web searches with cost-effective model selection and (OpenA
 Enhanced prompt template that guides Claude Desktop to:
 
 - Analyze user questions in conversation context
-- Select cost-effective models based on complexity
+- Choose cost-effective search parameters based on complexity
 - Choose appropriate reasoning effort levels
 - Use single, sequential, or parallel search strategies
 - Remember and use response IDs for conversation continuity
@@ -219,12 +218,13 @@ Enhanced prompt template that guides Claude Desktop to:
     "success": true,
     "answer": "The complete answer to your query...",
     "query": "original query",
-    "model": "gpt-5.4-mini-0210-global",
+    "model": "gpt-6-luna",
     "effort": "low",
     "timeout_used": "3m0s",
     "id": "resp_68a24ac476a081a09c4c914ee8827c2b0f42d84e6960dd2d",
-    "requested_model": "gpt-5.4-mini",
-    "requested_effort": "low"
+    "requested_model": "gpt-6-luna",
+    "requested_effort": "low",
+    "web_search_used": true
 }
 ```
 
@@ -241,7 +241,7 @@ includes an `id` field that can be used in follow-up queries to maintain context
     "name": "gpt_websearch",
     "arguments": {
         "query": "Tell me about Luxembourg City",
-        "model": "gpt-5.4-mini",
+        "model": "gpt-6-luna",
         "reasoning_effort": "medium"
     }
 }
@@ -282,7 +282,7 @@ answer [options] [question]
 Options:
   -q, -question    Question to ask (required, can also use positional argument)
   -provider       API provider: openai (default) or deepseek (env PROVIDER)
-  -model          Model (default: gpt-5.4-mini for openai, deepseek-flash for deepseek; env MODEL)
+  -model          Model (default: gpt-6-luna for openai, deepseek-flash for deepseek; env MODEL)
   -effort         Reasoning effort: none (90s), low (3min), medium (5min), high (10min), xhigh (15min timeout) (default: medium)
   -verbosity      Response verbosity: low, medium, high (default: medium)
   -timeout        Request timeout (overrides effort-based defaults)
@@ -317,8 +317,8 @@ Options:
 # Research query with high effort
 ./bin/answer -q "Latest breakthroughs in quantum computing" -effort high
 
-# Using gpt-5.4-mini for research tasks
-./bin/answer -q "Explain the theory of relativity" -model gpt-5.4-mini
+# Using gpt-6-luna for research tasks
+./bin/answer -q "Explain the theory of relativity" -model gpt-6-luna
 
 # DeepSeek backend
 ./bin/answer -provider deepseek -q "Latest EU regulations on AI"

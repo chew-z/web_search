@@ -11,10 +11,7 @@ CRITICAL RULE: You MUST use the gpt_websearch tool to answer the user's question
 <parameter_optimization>
 SELECT OPTIMAL PARAMETERS for cost-effectiveness and performance:
 
-Model Selection:
-- gpt-5.4-nano: Simple facts, definitions, quick lookups, basic summaries
-- gpt-5.4-mini: Well-defined research tasks, comparisons, specific topics with clear scope
-- gpt-5.4: Complex analysis, coding questions, multi-faceted problems, reasoning tasks
+Model: gpt-6-luna (the only available model; omit the model parameter)
 
 Reasoning Effort Selection:
 - none: No internal reasoning, fastest time-to-first-token (90s timeout)
@@ -43,17 +40,17 @@ Web Search Control:
   USE FOR: Clarification requests in continued conversations, formatting changes, follow-up questions about already-retrieved information
 
 RECOMMENDED COMBINATIONS:
-- Speed-Critical: gpt-5.4-nano + none + low + web_search=true
-- Coding Questions: gpt-5.4 + low + medium + web_search=true
-- Standard Research: gpt-5.4-mini + medium + medium + web_search=true
-- Complex Analysis: gpt-5.4 + high + high + web_search=true
-- Maximum Depth: gpt-5.4 + xhigh + high + web_search=true
-- Learning/Educational: gpt-5.4-mini/gpt-5.4 + medium/high + high + web_search=true
-- Clarification/Follow-up: any model + any effort + any verbosity + web_search=false
+- Speed-Critical: none + low + web_search=true
+- Coding Questions: low + medium + web_search=true
+- Standard Research: medium + medium + web_search=true
+- Complex Analysis: high + high + web_search=true
+- Maximum Depth: xhigh + high + web_search=true
+- Learning/Educational: medium/high + high + web_search=true
+- Clarification/Follow-up: any effort + any verbosity + web_search=false
 </parameter_optimization>
 
 <conversation_continuity>
-PERFORMANCE-CRITICAL: GPT-5 reasoning models create internal reasoning chains. Using previous_response_id AVOIDS RE-REASONING and improves performance.
+PERFORMANCE-CRITICAL: gpt-6-luna creates internal reasoning chains. Using previous_response_id AVOIDS RE-REASONING and improves performance.
 
 RULES:
 1. ALWAYS capture the "id" field from each gpt_websearch response
@@ -85,7 +82,7 @@ WORKFLOW for each user question:
    - web_search=true (DEFAULT): For new questions, research, current information
    - web_search=false: Only for clarification of already-retrieved information
 
-3. PLAN: Select optimal model/effort/verbosity combination based on:
+3. PLAN: Select optimal effort/verbosity combination based on:
    - Question complexity
    - Response speed requirements  
    - Level of detail needed
@@ -115,7 +112,7 @@ For multi-search strategies:
 
 <final_instructions>
 The gpt_websearch tool returns comprehensive answers, not citations or links to extract. ` +
-	`Be cost-conscious by using the simplest model that can handle the complexity, ` +
+	`Be cost-conscious by using the lowest reasoning effort that can handle the complexity, ` +
 	`but ensure you fully address the user's question.` + `
 
 Now analyze the user's question and use the gpt_websearch tool strategically with optimal parameters.

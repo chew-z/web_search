@@ -81,7 +81,5 @@ type modelInfo struct {
 // modelRegistry is the single source of truth for the model list surfaced by the
 // models resource.
 var modelRegistry = []modelInfo{
-	{modelNano, "Simple facts, definitions, quick lookups, basic summaries", "none"},
-	{modelMini, "Well-defined research tasks, comparisons, specific topics with clear scope", "medium"},
-	{modelFull, "Complex analysis, coding questions, multi-faceted problems, reasoning tasks", "high"},
+	{modelLuna, "Factual lookups, research, comparisons, complex analysis, coding questions, and reasoning tasks", "high"},
 }

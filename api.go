@@ -44,8 +44,8 @@ type CallAPIParams struct {
 	Timeout            time.Duration
 	UseWebSearch       bool
 	// WebSearchTool is the tool type sent when UseWebSearch is true
-	// (e.g. "web_search_preview" for OpenAI, "web_search" for DeepSeek).
-	// Empty falls back to the OpenAI tool type.
+	// ("web_search" for both OpenAI and DeepSeek).
+	// Empty falls back to "web_search".
 	WebSearchTool string
 	// HTTPClient overrides the package-level default client when non-nil.
 	// Enables per-request / test injection without touching the global.
@@ -125,11 +125,11 @@ func clientOrDefault(c *http.Client) *http.Client {
 	return httpClient
 }
 
-// webSearchToolType picks the upstream web search tool type; the OpenAI
-// preview name is the fallback for callers that don't set one explicitly.
+// webSearchToolType picks the upstream web search tool type; "web_search",
+// used by both providers, is the fallback when callers don't set one explicitly.
 func webSearchToolType(supplied string) string {
 	if supplied == "" {
-		return "web_search_preview"
+		return "web_search"
 	}
 	return supplied
 }
