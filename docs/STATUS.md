@@ -34,9 +34,14 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
 - Tests live beside the code as `*_test.go` and run without network access:
   `api_test.go`, `auth_test.go`, `config_test.go`, `deepseek_probe_test.go`,
   `logging_test.go`, `main_test.go`, `mcp_server_test.go`, `models_test.go`.
-- Nothing is deployed from this repository. `bin/answer` is built locally; production
-  serves the HTTP transport behind a reverse proxy at `karma.rrj.pl/answer/mcp`
-  (`.mcp.json`), with `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` left at its default.
+- Production runs commit `f76d4fc` since 2026-10-13: the `answer.service` systemd unit on
+  the VPS executes `bin/answer mcp -port 8086 -transport http`, served behind a reverse
+  proxy at `karma.rrj.pl/answer/mcp` (`.mcp.json`), with
+  `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` left at its default.
+  The provider comes from the unit's `Environment=` block, not from `.env`
+  (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)); it was switched from
+  `deepseek` to `openai` the same day and both were verified live.
+  Deployment is a manual build-and-copy; nothing in this repository automates it.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
   version string in code is still `0.3.5` (config.go:24). No release since.
 
@@ -46,7 +51,8 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
 
 - OpenAI collapsed to the single model `gpt-6-luna`, replacing the `gpt-5.4-nano` / `gpt-5.4-mini` / `gpt-5.4` ladder.
 - `gpt-5.4-nano` is deprecated with an April 1, 2027 shutdown.
-- The OpenAI Responses API web search tool type moved from `web_search_preview` to `web_search` to match the model's documented tool list.
+- The OpenAI Responses API web search tool type moved from `web_search_preview` to `web_search` to match the model's documented tool list;
+  confirmed live the same day — a `gpt-6-luna` call with search on returned a cited answer, where the old name would have failed with a 400.
 - The retired `deepseek-v4-flash` alias was replaced by the rolling alias `deepseek-flash` throughout the docs and the DeepSeek probe file.
 - The `deepseek-v4-pro` probe was dropped.
 

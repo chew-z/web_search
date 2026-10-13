@@ -37,7 +37,7 @@ tags: [open-items]
 
 ## Defects
 
-- **The README documents three HTTP endpoints that do not exist** — README.md:180-185
+- **The README documents three HTTP endpoints that do not exist** — README.md:184-189
   lists `GET /` (API documentation), `GET /health`, and `POST /message`, but the HTTP
   transport mounts the MCP streamable handler at `/` and nothing else
   (transport.go:26, transport.go:68). There is no health route and no `/message` route;

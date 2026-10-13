@@ -90,6 +90,16 @@ The registry (provider.go:33) is the single place a backend is described.
 | `openai` (default) | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `web_search` | `gpt-6-luna` | yes |
 | `deepseek` | `DEEPSEEK_API_KEY` | `https://api.deepseek.com/responses` | `web_search` | `deepseek-flash` | no |
 
+Both rows were confirmed against the live providers on 2026-10-13, through the deployed
+server at `karma.rrj.pl/answer/mcp`: each accepted `web_search` as the tool type,
+`reasoning.effort: none`, and `text.verbosity`,
+and the OpenAI continuity path round-tripped a real `previous_response_id`
+together with a caller-supplied `prompt_cache_key`.
+The two differ sharply in search freshness, which matters for a tool whose purpose is current facts:
+asked for the current Go release, `gpt-6-luna` answered 1.27.2 with a go.dev citation,
+while `deepseek-flash` twice answered 1.26.3 "as of May 2026" — months stale.
+Prefer the `openai` provider for version and freshness lookups.
+
 `SupportsContinuity` gates three things: computing a prompt cache key (main.go:263,
 api.go:252), dropping `previous_response_id` (api.go:255), and advertising those two
 parameters in the tool schema at all (mcp_server.go:110).
@@ -186,8 +196,20 @@ the `medium` label (config.go:184); the asymmetry is documented at config.go:165
 
 ### Precedence
 
-Flags beat environment variables, which beat defaults (main.go:143).
+Flags beat environment variables, which beat `.env`, which beats defaults (main.go:143).
 `-provider` is authoritative in both modes.
+
+`.env` sits at the bottom because the autoload import calls `godotenv.Load`, not `Overload`:
+`Load` sets a key only when the process environment does not already carry it
+(godotenv v1.5.1, `loadFile`, the `!currentEnv[key]` guard).
+So a variable set by the launcher — a systemd `Environment=` line, a shell `export`,
+an MCP client's `env` block — always wins over the same key in `.env`,
+and editing `.env` changes nothing for a process whose unit already sets that key.
+That is the trap behind a provider switch that "does not take":
+on 2026-10-13 the production unit carried `PROVIDER=deepseek` in its `Environment=`,
+so a restart after changing `.env` faithfully reloaded DeepSeek.
+Change the unit, `daemon-reload`, and confirm with the binary's own first log line,
+`"server starting" … "provider":"…"`, before trusting the switch.
 
 ## Wire types and storage
 

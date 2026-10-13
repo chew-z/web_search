@@ -64,7 +64,11 @@ go install github.com/chew-z/web_search@latest
 ### Providers
 
 Answer can talk to two Responses API backends, selected with the `PROVIDER`
-environment variable or the `-provider` flag (flag wins):
+environment variable or the `-provider` flag.
+Precedence is flag, then environment, then `.env`, then the default:
+`.env` only fills in variables the process does not already have,
+so a `PROVIDER` set by systemd, a shell `export`, or an MCP client's `env` block
+beats the one in `.env`.
 
 | Provider   | API key env        | Default model    | Notes                                                                     |
 | ---------- | ------------------ | ---------------- | ------------------------------------------------------------------------- |
