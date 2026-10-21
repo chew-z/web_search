@@ -73,19 +73,8 @@ func runMCPMode() {
 
 	// One-shot credential helpers run before any provider/API-key loading:
 	// minting tokens and hashing passwords needs no upstream credentials.
-	if *generateToken && *hashPassword {
-		Error("-generate-token and -hash-password cannot be used together")
-		os.Exit(1)
-	}
-	if *generateToken {
-		if err := runGenerateToken(*tokenUsername, *tokenTTL, os.Stdout); err != nil {
-			Error(err.Error())
-			os.Exit(1)
-		}
-		return
-	}
-	if *hashPassword {
-		if err := runHashPassword(os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if handled, err := runCredentialCommand(*generateToken, *hashPassword, *tokenUsername, *tokenTTL); handled {
+		if err != nil {
 			Error(err.Error())
 			os.Exit(1)
 		}

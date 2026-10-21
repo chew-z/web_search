@@ -34,6 +34,22 @@ var readPassword = func(stdin io.Reader, stderr io.Writer) (string, error) {
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
+// runCredentialCommand dispatches the one-shot -generate-token and
+// -hash-password flags. handled reports whether the process should exit after
+// this call; err carries the failure to log when it should not exit silently.
+func runCredentialCommand(generateToken, hashPassword bool, username string, ttl time.Duration) (handled bool, err error) {
+	if !generateToken && !hashPassword {
+		return false, nil
+	}
+	if generateToken && hashPassword {
+		return true, errors.New("-generate-token and -hash-password cannot be used together")
+	}
+	if generateToken {
+		return true, runGenerateToken(username, ttl, os.Stdout)
+	}
+	return true, runHashPassword(os.Stdin, os.Stdout, os.Stderr)
+}
+
 // runGenerateToken signs a static bearer token with GEMINI_AUTH_SECRET_KEY and
 // writes it to stdout.
 func runGenerateToken(username string, ttl time.Duration, stdout io.Writer) error {
