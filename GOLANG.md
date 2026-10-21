@@ -50,7 +50,9 @@ This project is a flat `package main` at the root; every file is listed in
 
 - `github.com/mark3labs/mcp-go` — the MCP server (`server`) and MCP types (`mcp`).
   Version 1.3.0.
-- `github.com/golang-jwt/jwt/v5` — HS256 bearer-token validation for the HTTP transport.
+- `github.com/golang-jwt/jwt/v5` — HS256 bearer-token signing and validation for the
+  HTTP transport.
+- `golang.org/x/term` — silent password read for `mcp -hash-password` (mcp_cli.go).
 - `github.com/joho/godotenv/autoload` — blank import in `main.go` that loads `.env`
   before `main` runs.
 - `encoding/json/v2` + `encoding/json/jsontext` — all wire encoding, GA since Go 1.27.
@@ -72,8 +74,9 @@ the transport is `net/http` plus mcp-go, and there is no persistence.
 - **Environment variables are CLI-only, except two.** `MODEL`, `EFFORT`, `TIMEOUT`,
   `QUESTION`, `SHOW_ALL`, and `PROMPT_CACHE_KEY` are read only by the CLI path;
   MCP callers pass the equivalent tool parameters. Only `PROVIDER` and the API key
-  are read in both modes, plus `GEMINI_AUTH_SECRET_KEY` and
-  `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` in MCP mode.
+  are read in both modes, plus `GEMINI_AUTH_SECRET_KEY`,
+  `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION`, and the `ANSWER_MCP_*` OAuth set
+  in MCP mode.
 - **Errors have two exit paths.** CLI failures return an `exitError` that `main` maps to
   a process exit code; MCP failures return structured tool errors. Neither path calls
   `log.Fatal` or `log.Panic`.

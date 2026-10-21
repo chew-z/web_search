@@ -21,7 +21,7 @@ func newTestMCPHandler(t *testing.T) http.Handler {
 	t.Helper()
 
 	// Minimal MCP config; API key not required for /health.
-	cfg := parseMCPConfig(MCPConfigParams{
+	cfg := parseMCPConfig(MCPConfig{
 		APIKey:    "test-key",
 		BaseURL:   defaultBaseURL,
 		Transport: "http",
@@ -102,7 +102,7 @@ func TestMCPServer_HTTP_HealthRoute(t *testing.T) {
 // keeps the JSON-RPC test client simple.
 func newStatelessMCPHandler(t *testing.T, baseURL string) http.Handler {
 	t.Helper()
-	cfg := parseMCPConfig(MCPConfigParams{
+	cfg := parseMCPConfig(MCPConfig{
 		APIKey:    "test-key",
 		BaseURL:   baseURL,
 		Transport: "http",

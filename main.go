@@ -45,6 +45,10 @@ func runMCPMode() {
 		authEnabled  = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires GEMINI_AUTH_SECRET_KEY env var)")
 		heartbeat    = mcpFlags.Duration("heartbeat", 30*time.Second,
 			"SSE heartbeat interval for HTTP transport (0 to disable); keeps long-running requests alive through proxies")
+		generateToken = mcpFlags.Bool("generate-token", false, "Generate a static bearer token and exit (requires GEMINI_AUTH_SECRET_KEY env var)")
+		tokenUsername = mcpFlags.String("token-username", "admin", "Username embedded in the -generate-token token")
+		tokenTTL      = mcpFlags.Duration("token-ttl", defaultTokenTTL, "Lifetime of the -generate-token token")
+		hashPassword  = mcpFlags.Bool("hash-password", false, "Hash an OAuth login password and exit (value for ANSWER_MCP_LOGIN_PASSWORD_HASH)")
 	)
 
 	// Also support long form for transport
@@ -67,6 +71,27 @@ func runMCPMode() {
 	// Honor -verbose for logger level
 	setVerbose(*verbose)
 
+	// One-shot credential helpers run before any provider/API-key loading:
+	// minting tokens and hashing passwords needs no upstream credentials.
+	if *generateToken && *hashPassword {
+		Error("-generate-token and -hash-password cannot be used together")
+		os.Exit(1)
+	}
+	if *generateToken {
+		if err := runGenerateToken(*tokenUsername, *tokenTTL, os.Stdout); err != nil {
+			Error(err.Error())
+			os.Exit(1)
+		}
+		return
+	}
+	if *hashPassword {
+		if err := runHashPassword(os.Stdin, os.Stdout, os.Stderr); err != nil {
+			Error(err.Error())
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Load environment config (validates the provider and reads its API key)
 	envCfg, err := loadEnvConfig(*providerName)
 	if err != nil {
@@ -74,19 +99,18 @@ func runMCPMode() {
 		os.Exit(1)
 	}
 
-	// Read auth secret from environment (same variable as GeminiMCP for interoperability)
-	authSecretKey, err := requireAuthSecret(*authEnabled)
+	// DNS rebinding protection: disabled by default since production deployments
+	// run behind nginx. Set ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION=false to enable.
+	disableLocalhostProtection, err := parseEnvBool("ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION", true)
 	if err != nil {
-		Error(err.Error())
+		Error("Failed to load config", "error", err)
 		os.Exit(1)
 	}
 
-	// DNS rebinding protection: disabled by default since production deployments
-	// run behind nginx. Set ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION=false to enable.
-	disableLocalhostProtection := parseEnvBool("ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION", true)
-
-	// Create server configuration using the config helper
-	cfg := parseMCPConfig(MCPConfigParams{
+	// Create server configuration using the config helper. The JWT secret uses
+	// the same variable as GeminiMCP for interoperability; Validate enforces
+	// its presence (and length when OAuth is on).
+	cfg := parseMCPConfig(MCPConfig{
 		Provider:                   envCfg.Provider,
 		APIKey:                     envCfg.APIKey,
 		BaseURL:                    *baseURL,
@@ -95,10 +119,18 @@ func runMCPMode() {
 		Host:                       *host,
 		Verbose:                    *verbose,
 		AuthEnabled:                *authEnabled,
-		AuthSecretKey:              authSecretKey,
+		AuthSecretKey:              os.Getenv("GEMINI_AUTH_SECRET_KEY"),
 		Heartbeat:                  *heartbeat,
 		DisableLocalhostProtection: disableLocalhostProtection,
 	})
+	if err := loadOAuthEnv(&cfg); err != nil {
+		Error("Failed to load OAuth config", "error", err)
+		os.Exit(1)
+	}
+	if err := cfg.Validate(); err != nil {
+		Error("Invalid configuration", "error", err)
+		os.Exit(1)
+	}
 
 	// Create and run MCP server
 	mcpServer := NewMCPServer(cfg)
@@ -125,16 +157,6 @@ func runTransport(mcpServer *server.MCPServer, cfg MCPConfig) {
 		Error("unknown transport", "transport", cfg.Transport)
 		os.Exit(1)
 	}
-}
-
-// requireAuthSecret reads the JWT secret (same variable as GeminiMCP for
-// interoperability) and enforces its presence when auth is enabled.
-func requireAuthSecret(authEnabled bool) (string, error) {
-	key := os.Getenv("GEMINI_AUTH_SECRET_KEY")
-	if authEnabled && key == "" {
-		return "", errors.New("GEMINI_AUTH_SECRET_KEY must be set when --auth-enabled is used")
-	}
-	return key, nil
 }
 
 // resolveEndpointAndModel applies provider defaults when the user did not

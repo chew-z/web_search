@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/chew-z/web_search/internal/oauth"
 )
 
 const (
@@ -105,17 +108,44 @@ type MCPConfig struct {
 	AuthSecretKey              string
 	Heartbeat                  time.Duration
 	DisableLocalhostProtection bool
+
+	// OAuth 2.1 connector auth (ANSWER_MCP_* environment variables).
+	OAuthEnabled           bool
+	OAuthIssuer            string
+	OAuthResource          string
+	OAuthLoginUser         string
+	OAuthLoginPasswordHash string
+	OAuthAccessTTL         time.Duration
+	OAuthRefreshTTL        time.Duration
 }
 
 // parseEnvBool reads a boolean environment variable with a fallback default.
-// If the variable is unset or unparseable, defaultVal is returned.
-func parseEnvBool(key string, defaultVal bool) bool {
-	if v := os.Getenv(key); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			return b
-		}
+// An unset variable yields defaultVal; an unparseable value is an error —
+// silently falling back on a typo in a security-relevant switch is how
+// servers end up publicly open.
+func parseEnvBool(key string, defaultVal bool) (bool, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal, nil
 	}
-	return defaultVal
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("%s: invalid value %q: %w", key, v, err)
+	}
+	return b, nil
+}
+
+// parseEnvDuration reads a duration environment variable with a fallback default.
+func parseEnvDuration(key string, defaultVal time.Duration) (time.Duration, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s: invalid value %q: %w", key, v, err)
+	}
+	return d, nil
 }
 
 // loadEnvConfig reads environment variables. providerOverride selects the
@@ -192,29 +222,12 @@ func validateVerbosity(verbosity string) string {
 	return defaultVerbosity
 }
 
-// MCPConfigParams holds the raw input values for building an MCPConfig.
-// Using a struct avoids a long positional parameter list and makes call sites
-// readable without per-argument comments.
-type MCPConfigParams struct {
-	Provider                   string
-	APIKey                     string
-	BaseURL                    string
-	Transport                  string
-	Port                       string
-	Host                       string
-	Verbose                    bool
-	AuthEnabled                bool
-	AuthSecretKey              string
-	Heartbeat                  time.Duration
-	DisableLocalhostProtection bool
-}
-
-// parseMCPConfig creates MCPConfig from the supplied parameters, applying
-// defaults where the caller left a field empty/zero. The base URL default is
-// provider-specific; unknown provider names fall back to the default provider
-// (the name is validated upstream at flag/env parsing).
-func parseMCPConfig(p MCPConfigParams) MCPConfig {
+// parseMCPConfig applies defaults where the caller left a field empty/zero.
+// The base URL default is provider-specific; unknown provider names fall back
+// to the default provider (the name is validated upstream at flag/env parsing).
+func parseMCPConfig(p MCPConfig) MCPConfig {
 	prov := providerOrDefault(p.Provider)
+	p.Provider = prov.Name
 
 	// Use defaults if not provided
 	if p.BaseURL == "" {
@@ -229,18 +242,68 @@ func parseMCPConfig(p MCPConfigParams) MCPConfig {
 	if p.Host == "" {
 		p.Host = "127.0.0.1"
 	}
-
-	return MCPConfig{
-		Provider:                   prov.Name,
-		APIKey:                     p.APIKey,
-		BaseURL:                    p.BaseURL,
-		Transport:                  p.Transport,
-		Port:                       p.Port,
-		Host:                       p.Host,
-		Verbose:                    p.Verbose,
-		AuthEnabled:                p.AuthEnabled,
-		AuthSecretKey:              p.AuthSecretKey,
-		Heartbeat:                  p.Heartbeat,
-		DisableLocalhostProtection: p.DisableLocalhostProtection,
+	if p.OAuthEnabled {
+		// OAuth access tokens are validated by the same guard as static JWTs.
+		p.AuthEnabled = true
 	}
+
+	return p
+}
+
+// OAuth defaults for the ANSWER_MCP_* environment variables.
+const (
+	defaultOAuthAccessTTL  = time.Hour
+	defaultOAuthRefreshTTL = 720 * time.Hour
+	minOAuthSecretLen      = 32
+)
+
+// loadOAuthEnv reads the OAuth connector-auth settings from ANSWER_MCP_*
+// environment variables into cfg.
+func loadOAuthEnv(cfg *MCPConfig) error {
+	enabled, err := parseEnvBool("ANSWER_MCP_OAUTH", false)
+	if err != nil {
+		return err
+	}
+	cfg.OAuthEnabled = enabled
+	cfg.OAuthIssuer = os.Getenv("ANSWER_MCP_ISSUER")
+	cfg.OAuthResource = os.Getenv("ANSWER_MCP_RESOURCE")
+	cfg.OAuthLoginUser = os.Getenv("ANSWER_MCP_LOGIN_USER")
+	cfg.OAuthLoginPasswordHash = os.Getenv("ANSWER_MCP_LOGIN_PASSWORD_HASH")
+	if cfg.OAuthAccessTTL, err = parseEnvDuration("ANSWER_MCP_ACCESS_TTL", defaultOAuthAccessTTL); err != nil {
+		return err
+	}
+	cfg.OAuthRefreshTTL, err = parseEnvDuration("ANSWER_MCP_REFRESH_TTL", defaultOAuthRefreshTTL)
+	return err
+}
+
+// OAuthConfig derives the OAuth authorization-server configuration from the
+// MCP settings. Scope and realm defaults come from oauth.Config.Validate
+// ("answer" / "answer-mcp").
+func (c MCPConfig) OAuthConfig() (oauth.Config, error) {
+	cfg := oauth.Config{
+		Issuer: c.OAuthIssuer, Resource: c.OAuthResource,
+		LoginUser: c.OAuthLoginUser, LoginPasswordHash: c.OAuthLoginPasswordHash,
+		AccessTokenTTL: c.OAuthAccessTTL, RefreshTokenTTL: c.OAuthRefreshTTL,
+		Signer: HS256Signer{Secret: c.AuthSecretKey, Issuer: c.OAuthIssuer, Audience: c.OAuthResource},
+	}
+	if err := cfg.Validate(); err != nil {
+		return oauth.Config{}, fmt.Errorf("validate OAuth config: %w", err)
+	}
+	return cfg, nil
+}
+
+// Validate enforces the auth configuration rules at startup.
+func (c MCPConfig) Validate() error {
+	if c.AuthEnabled && c.AuthSecretKey == "" {
+		return errors.New("GEMINI_AUTH_SECRET_KEY must be set when authentication is enabled")
+	}
+	if c.OAuthEnabled {
+		if len(c.AuthSecretKey) < minOAuthSecretLen {
+			return fmt.Errorf("GEMINI_AUTH_SECRET_KEY must be at least %d bytes when OAuth is enabled", minOAuthSecretLen)
+		}
+		if _, err := c.OAuthConfig(); err != nil {
+			return fmt.Errorf("validate OAuth configuration: %w", err)
+		}
+	}
+	return nil
 }

@@ -125,17 +125,24 @@ Do this first and alone, so later breakage is unambiguous.
 
 ### Phase 4 — config, env, and CLI helpers
 
-- [ ] Extend `MCPConfig` / `MCPConfigParams` (`config.go`) with
+- [x] Extend `MCPConfig` (`config.go`) with
       `OAuthEnabled`, `OAuthIssuer`, `OAuthResource`, `OAuthLoginUser`,
       `OAuthLoginPasswordHash`, `OAuthAccessTTL` (1 h), `OAuthRefreshTTL` (720 h).
-- [ ] Read `ANSWER_MCP_OAUTH`, `ANSWER_MCP_ISSUER`, `ANSWER_MCP_RESOURCE`,
+      `MCPConfigParams` collapsed into `MCPConfig` in the same change — the
+      OPEN_ITEMS debt note named exactly this trigger; the item is removed.
+- [x] Read `ANSWER_MCP_OAUTH`, `ANSWER_MCP_ISSUER`, `ANSWER_MCP_RESOURCE`,
       `ANSWER_MCP_LOGIN_USER`, `ANSWER_MCP_LOGIN_PASSWORD_HASH`,
-      `ANSWER_MCP_ACCESS_TTL`, `ANSWER_MCP_REFRESH_TTL`.
-- [ ] `Validate()`: OAuth implies auth enabled; secret ≥ 32 bytes when OAuth is on;
-      `OAuthConfig()` derives `oauth.Config` with the `HS256Signer` and validates at startup.
-- [ ] `mcp` subcommand (`main.go`): add `-generate-token`, `-token-username`,
-      `-token-ttl` (default 744 h), `-hash-password`; port Pushover's `readPassword`
-      test seam; add `golang.org/x/term` (the only new dependency).
+      `ANSWER_MCP_ACCESS_TTL`, `ANSWER_MCP_REFRESH_TTL` (`loadOAuthEnv`);
+      `parseEnvBool` now rejects unparseable values instead of silently defaulting.
+- [x] `Validate()`: OAuth implies auth enabled (forced in `parseMCPConfig`);
+      secret ≥ 32 bytes when OAuth is on; `OAuthConfig()` derives `oauth.Config`
+      with the `HS256Signer` and validates at startup. `requireAuthSecret` folded in.
+- [x] `mcp` subcommand (`main.go` + new `mcp_cli.go`): `-generate-token`,
+      `-token-username`, `-token-ttl` (default 744 h), `-hash-password`;
+      `readPassword` test seam ported; `golang.org/x/term` added. The one-shot
+      helpers run before provider/API-key loading.
+- [x] Smoked: CLI-minted token passes the guard (200); short secret and a bad
+      `ANSWER_MCP_OAUTH` value fail startup with clear errors.
 
 ### Phase 5 — transport wiring
 

@@ -172,7 +172,7 @@ func TestLoadEnvConfig_Table(t *testing.T) {
 func TestParseMCPConfig_Defaults(t *testing.T) {
 	t.Parallel()
 
-	got := parseMCPConfig(MCPConfigParams{})
+	got := parseMCPConfig(MCPConfig{})
 
 	if got.Provider != providerOpenAI {
 		t.Errorf("Provider = %q, want %q", got.Provider, providerOpenAI)
@@ -213,18 +213,7 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 		Heartbeat:     15 * time.Second,
 	}
 
-	got := parseMCPConfig(MCPConfigParams{
-		Provider:      want.Provider,
-		APIKey:        want.APIKey,
-		BaseURL:       want.BaseURL,
-		Transport:     want.Transport,
-		Port:          want.Port,
-		Host:          want.Host,
-		Verbose:       want.Verbose,
-		AuthEnabled:   want.AuthEnabled,
-		AuthSecretKey: want.AuthSecretKey,
-		Heartbeat:     want.Heartbeat,
-	})
+	got := parseMCPConfig(want)
 
 	if got != want {
 		t.Errorf("parseMCPConfig = %+v, want %+v", got, want)
@@ -234,7 +223,7 @@ func TestParseMCPConfig_NonDefaults(t *testing.T) {
 func TestParseMCPConfig_DeepSeekBaseURLDefault(t *testing.T) {
 	t.Parallel()
 
-	got := parseMCPConfig(MCPConfigParams{Provider: providerDeepSeek})
+	got := parseMCPConfig(MCPConfig{Provider: providerDeepSeek})
 
 	if got.BaseURL != deepseekBaseURL {
 		t.Errorf("BaseURL = %q, want %q", got.BaseURL, deepseekBaseURL)
