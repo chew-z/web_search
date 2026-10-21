@@ -36,17 +36,20 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   `api_test.go`, `auth_test.go`, `config_test.go`, `deepseek_probe_test.go`,
   `logging_test.go`, `main_test.go`, `mcp_cli_test.go`, `mcp_server_test.go`,
   `models_test.go`, `oauth_e2e_test.go`, plus the vendored suite under `internal/oauth/`.
-- Production runs commit `f76d4fc` since 2026-10-13: the `answer.service` systemd unit on
-  the VPS executes `bin/answer mcp -port 8086 -transport http`, served behind a reverse
-  proxy at `karma.rrj.pl/answer/mcp` (`.mcp.json`), with
-  `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` left at its default.
-  The provider comes from the unit's `Environment=` block, not from `.env`
-  (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)); it was switched from
-  `deepseek` to `openai` the same day and both were verified live.
+- Production runs commit `7bc8225` since 2026-10-21, with OAuth on: the `answer.service`
+  systemd unit executes `bin/answer mcp -port 8086 -transport http` from the repo checkout
+  at `/home/debian/Go/src/Answer`, behind nginx at `karma.rrj.pl/answer/mcp` with the
+  three blocks from `deploy/nginx-answer.conf` (the shared GET-denying alternation no
+  longer includes `answer`). `ANSWER_MCP_OAUTH=true` also switched the JWT guard on —
+  before this deploy the endpoint carried a secret but ran unauthenticated.
+  Verified live on 2026-10-21: 401 challenge with `resource_metadata`, both discovery
+  documents, `/health`, `/capabilities`, the full register → login → token → MCP →
+  refresh flow, static-JWT (`gemini-mcp` pair) interoperability, and bogus-token
+  rejection. Provider and keys come from the unit's `Environment=` block, not from
+  `.env` (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)).
   Deployment is manual: push, then on the VPS `git pull`, `task deps`,
   `task build`, restart the unit; nothing in this repository automates it.
-  **The OAuth port is not deployed yet** — production still runs the pre-OAuth build;
-  Phase 8 of [PLAN.md](PLAN.md) and [OPERATIONS.md](OPERATIONS.md) cover the rollout.
+  Outstanding: the claude.ai connector login itself (browser, owner's account).
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
   version string in code is still `0.3.5` (config.go:24). No release since.
 
@@ -70,10 +73,11 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
 - `/health` and `/capabilities` endpoints added (unauthenticated, Pushover parity).
 - Full e2e test walks discovery → register → login → token → refresh → MCP call;
   mutation checks confirm the scope and challenge assertions bite.
-- Deploy artifacts staged, not yet installed: `deploy/nginx-answer.conf` and
-  [OPERATIONS.md](OPERATIONS.md) (env reference, discovery paths, verification curls,
-  Connect-from-Claude). `MCPConfigParams` collapsed into `MCPConfig`; the README endpoint
-  list was corrected.
+- Deploy artifacts installed on karma and verified live the same day:
+  `deploy/nginx-answer.conf` (three blocks, `answer` removed from the shared
+  alternation and backend map) and the unit's `ANSWER_MCP_*` block;
+  [OPERATIONS.md](OPERATIONS.md) carries the runbook. `MCPConfigParams` collapsed
+  into `MCPConfig`; the README endpoint list was corrected.
 
 ### 2026-10-13 — model configuration refresh
 

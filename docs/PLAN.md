@@ -221,21 +221,24 @@ register → branded login page → code → token → authenticated MCP initial
 The edited `answer.service` and `karma.rrj.pl.conf` are staged in `tmp/`
 (gitignored; they carry live credentials — handle with care).
 
-- [ ] Push `main`; on karma pull, `task deps`, `task build`.
-- [ ] Install the edited unit (`tmp/answer.service` → `/etc/systemd/system/`),
-      `daemon-reload`, restart `answer.service`.
-- [ ] Edit karma's nginx **atomically**: add the three blocks and remove `answer` from the
-      shared `location ~ ^/(?:answer|gemini|time)/(.*)$` alternation and the `$mcp_backend`
-      map in the same change — that block denies GET and `/authorize` is a browser GET.
-      `sudo nginx -t && sudo systemctl reload nginx`.
-- [ ] Verify from a trusted shell:
-      `curl -si -X POST https://karma.rrj.pl/answer/mcp` → 401 with `resource_metadata`;
-      both well-known URLs → 200 with correct documents;
-      `/answer/health` and `/answer/capabilities` → 200;
-      a request carrying an existing static JWT → still works.
+- [x] Push `main`; on karma pull, `task deps`, `task build` (owner, 2026-10-21).
+- [x] Install the edited unit (`tmp/answer.service` → `/etc/systemd/system/`),
+      `daemon-reload`, restart `answer.service` (owner, 2026-10-21).
+- [x] Edit karma's nginx **atomically**: three blocks added, `answer` removed from the
+      shared `location ~ ^/(?:answer|gemini|time)/(.*)$` alternation and the
+      `$mcp_backend` map in the same change; `nginx -t` and reload (owner, 2026-10-21).
+- [x] Verified live from the dev box on 2026-10-21:
+      `POST /answer/mcp` without a token → 401 with the full `resource_metadata`
+      challenge; both well-known documents → 200 with correct contents;
+      `/answer/health` and `/answer/capabilities` → 200; bare `GET /answer/authorize`
+      → 400 from the OAuth server (edge passes GET); full curl flow
+      register → branded login page → login → code → token → MCP initialize 200 →
+      refresh; static JWT signed with the production secret (`gemini-mcp` pair, with
+      `exp`) → 200; bogus token → 401.
 - [ ] Add the claude.ai custom connector with URL `https://karma.rrj.pl/answer/mcp`,
-      empty client ID/secret; complete the browser login; call `gpt_websearch`.
-- [ ] Record the deployment in `docs/STATUS.md`; retire this plan to `docs/retired/`.
+      empty client ID/secret; complete the browser login and call `gpt_websearch`.
+      (Owner's account and browser; optionally also the Claude Code `/mcp` login.)
+- [ ] Record the connector login in `docs/STATUS.md`; retire this plan to `docs/retired/`.
 
 ## Risks and notes
 

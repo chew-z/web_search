@@ -51,7 +51,3 @@ tags: [open-items]
   browser login once their access token expires, and an issued access token stays valid
   until its `exp` no matter what — keep `ANSWER_MCP_ACCESS_TTL` short. The same trade-off
   is accepted in Pushover and Alerts; see OPERATIONS.md troubleshooting.
-- **2026-10-21 — the karma deployment of the OAuth port is pending** (PLAN.md Phase 8):
-  unit `Environment=` additions, the atomic nginx edit (three new blocks plus removing
-  `answer` from the shared GET-denying alternation), the live verification curls, and the
-  claude.ai connector login. Until then production still runs the pre-OAuth build.
