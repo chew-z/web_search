@@ -50,12 +50,12 @@ func runCredentialCommand(generateToken, hashPassword bool, username string, ttl
 	return true, runHashPassword(os.Stdin, os.Stdout, os.Stderr)
 }
 
-// runGenerateToken signs a static bearer token with GEMINI_AUTH_SECRET_KEY and
+// runGenerateToken signs a static bearer token with ANSWER_AUTH_SECRET_KEY and
 // writes it to stdout.
 func runGenerateToken(username string, ttl time.Duration, stdout io.Writer) error {
-	secret := os.Getenv("GEMINI_AUTH_SECRET_KEY")
+	secret := os.Getenv("ANSWER_AUTH_SECRET_KEY")
 	if secret == "" {
-		return errors.New("GEMINI_AUTH_SECRET_KEY environment variable is required for token generation")
+		return errors.New("ANSWER_AUTH_SECRET_KEY environment variable is required for token generation")
 	}
 	token, err := GenerateStaticToken(secret, username, ttl)
 	if err != nil {

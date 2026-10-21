@@ -213,8 +213,8 @@ func resolvePromptCacheKey(ctx context.Context, supplied string) string {
 	if supplied != "" {
 		return supplied
 	}
-	if userID, _ := getUserInfo(ctx); userID != "" {
-		return serverName + ":" + userID
+	if actor, ok := actorFrom(ctx); ok && actor != "" {
+		return serverName + ":" + actor
 	}
 	return serverName
 }

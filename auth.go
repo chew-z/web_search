@@ -12,35 +12,22 @@ import (
 )
 
 // staticIssuer, staticAudience, authRealm, and maxMCPBodyBytes define the
-// static authentication values and the MCP request-body limit. The static
-// issuer/audience are GeminiMCP's so tokens minted there with the same
-// secret keep working here.
+// static authentication values and the MCP request-body limit.
 const (
-	staticIssuer    = "gemini-mcp"
-	staticAudience  = "gemini-mcp-user"
+	staticIssuer    = "answer-mcp"
+	staticAudience  = "answer-mcp-user"
 	authRealm       = "answer-mcp"
 	maxMCPBodyBytes = 4 << 20
 )
 
-type contextKey string
+// actorKey identifies the authenticated username in a request context.
+type actorKey struct{}
 
-// userInfo groups authenticated user identity fields under a single context
-// key, avoiding context pollution from multiple keys for related data.
-type userInfo struct {
-	ID       string
-	Username string
-	Role     string
-}
-
-const userInfoKey contextKey = "user_info"
-
-// Claims carries both token profiles the guard accepts: legacy static tokens
-// (GeminiMCP-compatible user_id/username/role) and OAuth tokens
-// (username/scope minted by internal/oauth).
+// Claims carries what the project's own tokens hold: static tokens minted by
+// `mcp -generate-token` carry a username only; OAuth tokens carry the scope as
+// well. Both sit over the registered claims.
 type Claims struct {
-	UserID   string `json:"user_id,omitempty"`
-	Username string `json:"username,omitempty"`
-	Role     string `json:"role,omitempty"`
+	Username string `json:"username"`
 	Scope    string `json:"scope,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -84,7 +71,7 @@ func (s HS256Signer) Sign(username, scope string, ttl time.Duration) (string, er
 }
 
 // extractTokenFromHeader extracts a Bearer token from an Authorization header.
-// Uses strings.Fields for robust whitespace handling (mirrors GeminiMCP).
+// Uses strings.Fields for robust whitespace handling.
 func extractTokenFromHeader(authHeader string) string {
 	parts := strings.Fields(authHeader)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
@@ -124,9 +111,9 @@ type authGuard struct {
 	oauth  *oauth.Config
 }
 
-// newAuthGuard builds the static pair (gemini-mcp/gemini-mcp-user, no scope),
-// preserving legacy tokens with user_id/role, and — when OAuth is configured —
-// adds its issuer/resource pair, which requires its scope.
+// newAuthGuard builds the static pair (answer-mcp/answer-mcp-user, no scope)
+// and — when OAuth is configured — adds its issuer/resource pair, which
+// requires its scope.
 func newAuthGuard(secret string, oauthCfg *oauth.Config) *authGuard {
 	guard := &authGuard{secret: secret, pairs: []tokenPair{{issuer: staticIssuer, audience: staticAudience}}, oauth: oauthCfg}
 	if oauthCfg != nil {
@@ -138,8 +125,8 @@ func newAuthGuard(secret string, oauthCfg *oauth.Config) *authGuard {
 // protectMCP enforces auth at the HTTP layer so clients receive a real 401 and
 // WWW-Authenticate (claude.ai starts OAuth only on that); it caps bodies
 // because mcp-go uses io.ReadAll, a nil guard means open mode, and OPTIONS
-// passes CORS preflight. Tool handlers see the authenticated identity through
-// userInfoKey: mcp-go derives the tool context from the request context
+// passes CORS preflight. Tool handlers see the authenticated username through
+// actorKey: mcp-go derives the tool context from the request context
 // (streamable_http.go), so the value set here flows through.
 func (g *authGuard) protectMCP(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -165,24 +152,13 @@ func (g *authGuard) protectMCP(next http.Handler) http.Handler {
 				writeAuthError(w, http.StatusForbidden, "insufficient_scope")
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userInfoKey, identityOf(parsedClaims))))
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), actorKey{}, parsedClaims.Username)))
 			return
 		}
 		Debug("auth rejected", "reason", "unknown issuer/audience", "username", parsedClaims.Username)
 		g.writeChallenge(w, "invalid_token")
 		writeAuthError(w, http.StatusUnauthorized, "unauthorized")
 	})
-}
-
-// identityOf maps claims onto the context identity. OAuth and CLI-minted
-// tokens carry no user_id, so the username doubles as the shard key that
-// resolvePromptCacheKey reads.
-func identityOf(claims *Claims) userInfo {
-	id := claims.UserID
-	if id == "" {
-		id = claims.Username
-	}
-	return userInfo{ID: id, Username: claims.Username, Role: claims.Role}
 }
 
 // hasAudience reports whether the expected audience is present in a JWT claim set.
@@ -210,11 +186,9 @@ func writeAuthError(w http.ResponseWriter, status int, code string) {
 	respondJSON(w, status, map[string]string{"error": code})
 }
 
-// getUserInfo extracts user identity fields from the request context.
-// Returns empty strings when the context carries no identity (e.g. stdio).
-func getUserInfo(ctx context.Context) (userID, username string) {
-	if info, ok := ctx.Value(userInfoKey).(userInfo); ok {
-		return info.ID, info.Username
-	}
-	return "", ""
+// actorFrom returns the authenticated username stored in a context.
+// It returns false when the context carries no identity (e.g. stdio or open mode).
+func actorFrom(ctx context.Context) (string, bool) {
+	actor, ok := ctx.Value(actorKey{}).(string)
+	return actor, ok
 }

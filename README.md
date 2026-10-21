@@ -189,10 +189,11 @@ To use DeepSeek instead, add `"PROVIDER": "deepseek"` and set `DEEPSEEK_API_KEY`
   `POST /token`, `POST /register`, and the RFC 9728 / RFC 8414 `/.well-known/...`
   discovery documents.
 
-**Authentication (HTTP transport):** opt-in with `-auth-enabled`; requests then need
-`Authorization: Bearer <JWT>` (HS256, signed with `GEMINI_AUTH_SECRET_KEY`).
+**Authentication (HTTP transport):** opt-in with `-auth-enabled`, and forced on by
+`ANSWER_MCP_OAUTH=true`; requests then need `Authorization: Bearer <JWT>` (HS256, signed
+with `ANSWER_AUTH_SECRET_KEY`).
 Two token profiles are accepted: static tokens minted with
-`./bin/answer mcp -generate-token` (interchangeable with GeminiMCP), and OAuth 2.1 access
+`./bin/answer mcp -generate-token`, and OAuth 2.1 access
 tokens from the browser login that claude.ai connectors start automatically from the 401
 challenge. Deployment, connector setup, and verification runbook:
 [docs/OPERATIONS.md](docs/OPERATIONS.md).

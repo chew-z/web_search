@@ -30,13 +30,13 @@ authorization server; the split below is by concern, not by package.
 | `main.go` | CLI + MCP entry | `main` routes on `os.Args[1] == "mcp"` (main.go:19); `runCLI`; `runMCPMode` (main.go:34) and the credential commands. |
 | `api.go` | shared | `CallAPI` (api.go:56), the one outbound HTTP call; `ExtractAnswer` (api.go:166); `HandleWebSearch` (api.go:223). |
 | `provider.go` | shared | The `provider` struct (provider.go:22) and `providerRegistry` (provider.go:33); lookups at provider.go:66, provider.go:80. |
-| `config.go` | shared | `loadEnvConfig` (config.go:155), `parseMCPConfig` (config.go:228), OAuth load and validation (config.go:262-316). |
+| `config.go` | shared | `loadEnvConfig` (config.go:155), `parseMCPConfig` (config.go:228), OAuth load and validation (config.go:262-315). |
 | `models.go` | shared | `effortRegistry` (models.go:20), `verbosityLevels` (models.go:29), `modelRegistry` (models.go:83), plus the schema helpers. |
 | `prompts.go` | MCP only | The two guidance prompts: `webSearchPrompt` (prompts.go:4) and `deepseekWebSearchPrompt` (prompts.go:124). |
 | `mcp_server.go` | MCP only | `NewMCPServer` (mcp_server.go:26), the tool/resource/prompt registrations and handlers, `logToClient`. |
 | `transport.go` | MCP only | `RunHTTPTransport`, `buildHTTPHandler`: guarded MCP catch-all, `/health`, `/capabilities`, OAuth mount, timeouts. |
-| `auth.go` | MCP HTTP only | Token minting (auth.go:49-87), `parseBearerToken` (auth.go:99), guard `protectMCP` (auth.go:144), `getUserInfo` (auth.go:215). |
-| `mcp_cli.go` | MCP only | Credential helpers: `runGenerateToken` (mcp_cli.go:39), `runHashPassword` (mcp_cli.go:55), `readPassword` seam (mcp_cli.go:21). |
+| `auth.go` | MCP HTTP only | Token minting (auth.go:36-71), `parseBearerToken` (auth.go:86), guard `protectMCP` (auth.go:131), `actorFrom` (auth.go:191). |
+| `mcp_cli.go` | MCP only | Credential helpers: `runGenerateToken` (mcp_cli.go:55), `runHashPassword` (mcp_cli.go:71), `readPassword` seam (mcp_cli.go:21). |
 | `internal/oauth/` | MCP HTTP only | Vendored OAuth 2.1 authorization server (Pushover copy); entry `Mount` (mount.go:9), design under Transport and auth. |
 | `logging.go` | both | A `slog` JSON logger on stderr, initialised by `initLogger` (logging.go:19), plus the `Debug`/`Info`/`Warn`/`Error` wrappers. |
 | `errors.go` | both | `ErrNoAPIKey`, `ErrInvalidProvider`, `APIError`, and the CLI-only `exitError` / `fail`. |
@@ -45,22 +45,22 @@ authorization server; the split below is by concern, not by package.
 
 ### CLI
 
-1. `runCLI` (main.go:238) does an advisory `loadEnvConfig("")` (main.go:243) purely to seed
+1. `runCLI` (main.go:249) does an advisory `loadEnvConfig("")` (main.go:254) purely to seed
    flag defaults, ignoring its error.
-2. `parseCLIArgs` (main.go:169) defines the flags, calls `flag.Parse`, and resolves the
-   question from `-q`, `-question`, or the positional argument (main.go:219).
+2. `parseCLIArgs` (main.go:179) defines the flags, calls `flag.Parse`, and resolves the
+   question from `-q`, `-question`, or the positional argument (main.go:229).
 3. Effort and verbosity are normalised to `medium` when unrecognised
-   (main.go:199, config.go:180, config.go:188).
+   (main.go:209-210, config.go:210, config.go:218).
 4. Timeout precedence: the `-timeout` flag, else `TIMEOUT`, else
-   `getTimeoutForEffort(effort)` (main.go:201).
-5. The authoritative `loadEnvConfig(args.provider)` (main.go:248) validates the provider and
+   `getTimeoutForEffort(effort)` (main.go:199, main.go:211-213).
+5. The authoritative `loadEnvConfig(args.provider)` (main.go:258) validates the provider and
    requires its API key; failure exits with code 2.
-6. `resolveEndpointAndModel` (main.go:143) applies provider defaults when `-base` / `-model`
+6. `resolveEndpointAndModel` (main.go:153) applies provider defaults when `-base` / `-model`
    were not supplied.
-7. The prompt cache key is resolved only when the provider supports continuity (main.go:263).
+7. The prompt cache key is resolved only when the provider supports continuity (main.go:273).
 8. `CallAPI` (api.go:56) applies `context.WithTimeout` (api.go:85), attaches the web-search
    tool when enabled (api.go:74), and sets `Authorization: Bearer` (api.go:93).
-9. Output: `-show-all` prints the raw response as indented JSON (main.go:283); otherwise
+9. Output: `-show-all` prints the raw response as indented JSON (main.go:293); otherwise
    `ExtractAnswer` (api.go:166) strips the narration and prints the answer.
    An empty answer exits with code 3.
 
@@ -68,13 +68,13 @@ authorization server; the split below is by concern, not by package.
 
 1. `runMCPMode` (main.go:34) parses flags from `os.Args[2:]`; `-transport` overrides `-t`.
    The one-shot credential commands `-generate-token` and `-hash-password` run before any
-   provider or API-key loading and exit (main.go:76-95).
-2. Provider and API key come from `loadEnvConfig` (main.go:96); the JWT secret from
-   `GEMINI_AUTH_SECRET_KEY` (main.go:122) and the OAuth settings from `loadOAuthEnv`
-   (main.go:126, config.go:262). `Validate` (config.go:302) refuses startup on a missing
+   provider or API-key loading and exit (main.go:74-82).
+2. Provider and API key come from `loadEnvConfig` (main.go:85); the JWT secret from
+   `ANSWER_AUTH_SECRET_KEY` (main.go:111) and the OAuth settings from `loadOAuthEnv`
+   (main.go:115, config.go:262). `Validate` (config.go:302) refuses startup on a missing
    secret, a secret shorter than 32 bytes with OAuth on, or an invalid OAuth derivation.
 3. `parseMCPConfig` (config.go:228) fills the remaining defaults, then `NewMCPServer`
-   (main.go:136) builds the server and `runTransport` (main.go:144) starts it.
+   (main.go:125) builds the server and `runTransport` (main.go:133) starts it.
 
 Per tool call: `webSearchHandler` (mcp_server.go:137) → `HandleWebSearch` (api.go:223) →
 `CallAPI` → `ExtractAnswer` → a `WebSearchResult` returned as structured-only content
@@ -106,7 +106,7 @@ asked for the current Go release, `gpt-6-luna` answered 1.27.2 with a go.dev cit
 while `deepseek-flash` twice answered 1.26.3 "as of May 2026" — months stale.
 Prefer the `openai` provider for version and freshness lookups.
 
-`SupportsContinuity` gates three things: computing a prompt cache key (main.go:263,
+`SupportsContinuity` gates three things: computing a prompt cache key (main.go:273,
 api.go:252), dropping `previous_response_id` (api.go:255), and advertising those two
 parameters in the tool schema at all (mcp_server.go:110).
 `Models` feeds the `models://list` resource, `Prompt` feeds the MCP prompt, and
@@ -114,7 +114,7 @@ parameters in the tool schema at all (mcp_server.go:110).
 
 ## MCP surface
 
-Server name `gpt-websearch-mcp`, version `0.3.5` (config.go:22, config.go:24), with logging, tools,
+Server name `gpt-websearch-mcp`, version `0.3.5` (config.go:25, config.go:27), with logging, tools,
 resources, prompts, recovery, and input/output schema validation enabled (mcp_server.go:28).
 
 - **Tool `gpt_websearch`** (registered mcp_server.go:45, defined mcp_server.go:88).
@@ -138,17 +138,18 @@ Server timeouts are read 30s, write 15m (matching the `xhigh` budget), idle 120s
 (transport.go:16-20).
 `-heartbeat` sets the SSE heartbeat interval, default 30s, `0` disables it (main.go:46).
 `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` (default `true`) toggles mcp-go's DNS-rebinding
-protection, which is off because production runs behind a reverse proxy (main.go:104,
+protection, which is off because production runs behind a reverse proxy (main.go:93,
 transport.go:87).
 
 Bearer auth is opt-in via `-auth-enabled`, HTTP-only, and enforced at the HTTP layer before
-any MCP handshake (transport.go:105-112).
+any MCP handshake (transport.go:104-112).
 The guard validates one HS256 JWT parse — `exp` required, 60s clock leeway, non-empty
-username (auth.go:99) — against two token profiles (auth.go:130):
+username (auth.go:86) — against two token profiles (auth.go:117):
 
-- the **static pair**: issuer `gemini-mcp`, audience `gemini-mcp-user`, no scope required;
-  interchangeable with GeminiMCP tokens, and minted by `mcp -generate-token`
-  (mcp_cli.go:39);
+- the **static pair**: issuer `answer-mcp`, audience `answer-mcp-user`, no scope required;
+  minted by `mcp -generate-token` (mcp_cli.go:55). Auth is fully self-contained — the
+  former GeminiMCP compatibility (shared `GEMINI_AUTH_SECRET_KEY`, `gemini-mcp` pair,
+  `user_id`/`role` claims) was removed on 2026-10-21;
 - the **OAuth pair**: issuer `ANSWER_MCP_ISSUER`, audience `ANSWER_MCP_RESOURCE`, scope
   `answer` required; minted by the vendored OAuth 2.1 authorization server, mounted beside
   the MCP endpoint when `ANSWER_MCP_OAUTH=true` (transport.go:116) with RFC 9728/8414
@@ -157,14 +158,15 @@ username (auth.go:99) — against two token profiles (auth.go:130):
   Its state is in-memory, so a restart eventually requires a fresh login.
 
 Failures return 401 with `WWW-Authenticate: Bearer realm="answer-mcp"` and an error code;
-with OAuth enabled the challenge carries `resource_metadata` and `scope` (auth.go:200-206) —
+with OAuth enabled the challenge carries `resource_metadata` and `scope` (auth.go:176-182) —
 the RFC 9728 trigger that starts claude.ai's connector login.
-A valid token with the wrong scope gets 403 `insufficient_scope`.
-Request bodies are capped at 4 MiB (auth.go:22) and OPTIONS preflight passes unauthenticated
-(auth.go:146-150).
-On success the claims land in the request context as `userInfo` (auth.go:168, auth.go:180)
-and feed the per-user cache key and handler logging; mcp-go derives the tool context from
-the request context, so the identity reaches tool handlers.
+A valid token with the wrong scope gets 403 `insufficient_scope` (auth.go:149-154).
+Request bodies are capped at 4 MiB (auth.go:20) and OPTIONS preflight passes unauthenticated
+(auth.go:134-137).
+On success the username lands in the request context under `actorKey{}` (auth.go:155), and
+`actorFrom` (auth.go:191) reads it back for the per-user cache key (api.go:216) and the
+handler log line (mcp_server.go:142); mcp-go derives the tool context from the request
+context, so the identity reaches tool handlers.
 `/health` and `/capabilities` serve unauthenticated operator metadata
 (transport.go:113-114).
 
@@ -177,16 +179,16 @@ import (main.go:13).
 
 | Variable | Read for | Mode | Default |
 | --- | --- | --- | --- |
-| `PROVIDER` | `openai` or `deepseek` (config.go:128) | both | `openai` |
-| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | the active provider's key (config.go:156) | both | required |
-| `QUESTION` | default for `-q` (config.go:137) | CLI | — |
-| `MODEL` | default for `-model` (config.go:138) | CLI | provider model |
-| `EFFORT` | default for `-effort` (config.go:139) | CLI | `medium` |
-| `SHOW_ALL` | default for `-show-all` (config.go:142) | CLI | `false` |
-| `TIMEOUT` | default for `-timeout` (config.go:149) | CLI | effort-derived |
-| `PROMPT_CACHE_KEY` | default for `-cache-key` (main.go:190) | CLI | — |
-| `GEMINI_AUTH_SECRET_KEY` | HTTP JWT signing and validation secret (main.go:122) | MCP | required with `-auth-enabled`; ≥ 32 bytes with OAuth |
-| `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | DNS-rebinding protection (main.go:104) | MCP | `true` (protection off) |
+| `PROVIDER` | `openai` or `deepseek` (config.go:158) | both | `openai` |
+| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | the active provider's key (config.go:186) | both | required |
+| `QUESTION` | default for `-q` (config.go:167) | CLI | — |
+| `MODEL` | default for `-model` (config.go:168) | CLI | provider model |
+| `EFFORT` | default for `-effort` (config.go:169) | CLI | `medium` |
+| `SHOW_ALL` | default for `-show-all` (config.go:172) | CLI | `false` |
+| `TIMEOUT` | default for `-timeout` (config.go:179) | CLI | effort-derived |
+| `PROMPT_CACHE_KEY` | default for `-cache-key` (main.go:201) | CLI | — |
+| `ANSWER_AUTH_SECRET_KEY` | HTTP JWT signing and validation secret (main.go:111) | MCP | required with `-auth-enabled`; ≥ 32 bytes with OAuth |
+| `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | DNS-rebinding protection (main.go:93) | MCP | `true` (protection off) |
 | `ANSWER_MCP_OAUTH` | enable the OAuth 2.1 server; implies auth (config.go:262) | MCP | `false` |
 | `ANSWER_MCP_ISSUER` | public OAuth issuer URL (config.go:274) | MCP | — |
 | `ANSWER_MCP_RESOURCE` | public protected-resource URL (config.go:275) | MCP | — |
@@ -203,7 +205,7 @@ Set them per call through the tool parameters instead.
 
 `-q` / `-question` (or a positional argument) supply the question; `-provider`, `-base`,
 `-model`, `-effort`, `-verbosity`, `-web-search`, `-timeout`, `-show-all`, and `-cache-key`
-are defined in `parseCLIArgs` (main.go:169).
+are defined in `parseCLIArgs` (main.go:179).
 
 ### MCP flags
 
@@ -222,12 +224,12 @@ before any provider loading.
 | `high` | 10m | |
 | `xhigh` | 15m | matches the HTTP server write timeout |
 
-An unrecognised effort deliberately resolves to the `low` timeout (config.go:173) but to
-the `medium` label (config.go:184); the asymmetry is documented at config.go:165.
+An unrecognised effort deliberately resolves to the `low` timeout (config.go:199-204) but to
+the `medium` label (config.go:210-215); the asymmetry is documented at config.go:194-198.
 
 ### Precedence
 
-Flags beat environment variables, which beat `.env`, which beats defaults (main.go:143).
+Flags beat environment variables, which beat `.env`, which beats defaults (main.go:153-163).
 `-provider` is authoritative in both modes.
 
 `.env` sits at the bottom because the autoload import calls `godotenv.Load`, not `Overload`:

@@ -10,16 +10,16 @@ import (
 
 func TestRunGenerateToken(t *testing.T) {
 	t.Run("missing_secret_errors", func(t *testing.T) {
-		t.Setenv("GEMINI_AUTH_SECRET_KEY", "")
+		t.Setenv("ANSWER_AUTH_SECRET_KEY", "")
 		var out bytes.Buffer
 		err := runGenerateToken("alice", time.Hour, &out)
-		if err == nil || !strings.Contains(err.Error(), "GEMINI_AUTH_SECRET_KEY") {
+		if err == nil || !strings.Contains(err.Error(), "ANSWER_AUTH_SECRET_KEY") {
 			t.Fatalf("err = %v", err)
 		}
 	})
 
 	t.Run("token_passes_the_guard_parse", func(t *testing.T) {
-		t.Setenv("GEMINI_AUTH_SECRET_KEY", testSecret)
+		t.Setenv("ANSWER_AUTH_SECRET_KEY", testSecret)
 		var out bytes.Buffer
 		if err := runGenerateToken("alice", 24*time.Hour, &out); err != nil {
 			t.Fatalf("runGenerateToken() error = %v", err)
@@ -38,7 +38,7 @@ func TestRunGenerateToken(t *testing.T) {
 	})
 
 	t.Run("nonpositive_ttl_errors", func(t *testing.T) {
-		t.Setenv("GEMINI_AUTH_SECRET_KEY", testSecret)
+		t.Setenv("ANSWER_AUTH_SECRET_KEY", testSecret)
 		var out bytes.Buffer
 		if err := runGenerateToken("alice", 0, &out); err == nil {
 			t.Fatal("expected error for zero TTL")
@@ -96,7 +96,7 @@ func TestRunCredentialCommand(t *testing.T) {
 	})
 
 	t.Run("generate_token_handled", func(t *testing.T) {
-		t.Setenv("GEMINI_AUTH_SECRET_KEY", testSecret)
+		t.Setenv("ANSWER_AUTH_SECRET_KEY", testSecret)
 		handled, err := runCredentialCommand(true, false, "alice", time.Hour)
 		if !handled || err != nil {
 			t.Fatalf("handled = %v, err = %v", handled, err)

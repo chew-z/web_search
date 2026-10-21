@@ -42,10 +42,10 @@ func runMCPMode() {
 		baseURL      = mcpFlags.String("base", "", "API base URL (default: provider-specific)")
 		providerName = mcpFlags.String("provider", "", "API provider: openai or deepseek (default: env PROVIDER, else openai)")
 		verbose      = mcpFlags.Bool("verbose", false, "Enable verbose logging")
-		authEnabled  = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires GEMINI_AUTH_SECRET_KEY env var)")
+		authEnabled  = mcpFlags.Bool("auth-enabled", false, "Enable JWT authentication for HTTP transport (requires ANSWER_AUTH_SECRET_KEY env var)")
 		heartbeat    = mcpFlags.Duration("heartbeat", 30*time.Second,
 			"SSE heartbeat interval for HTTP transport (0 to disable); keeps long-running requests alive through proxies")
-		generateToken = mcpFlags.Bool("generate-token", false, "Generate a static bearer token and exit (requires GEMINI_AUTH_SECRET_KEY env var)")
+		generateToken = mcpFlags.Bool("generate-token", false, "Generate a static bearer token and exit (requires ANSWER_AUTH_SECRET_KEY env var)")
 		tokenUsername = mcpFlags.String("token-username", "admin", "Username embedded in the -generate-token token")
 		tokenTTL      = mcpFlags.Duration("token-ttl", defaultTokenTTL, "Lifetime of the -generate-token token")
 		hashPassword  = mcpFlags.Bool("hash-password", false, "Hash an OAuth login password and exit (value for ANSWER_MCP_LOGIN_PASSWORD_HASH)")
@@ -96,9 +96,9 @@ func runMCPMode() {
 		os.Exit(1)
 	}
 
-	// Create server configuration using the config helper. The JWT secret uses
-	// the same variable as GeminiMCP for interoperability; Validate enforces
-	// its presence (and length when OAuth is on).
+	// Create server configuration using the config helper. The JWT secret comes
+	// from ANSWER_AUTH_SECRET_KEY; Validate enforces its presence (and length
+	// when OAuth is on).
 	cfg := parseMCPConfig(MCPConfig{
 		Provider:                   envCfg.Provider,
 		APIKey:                     envCfg.APIKey,
@@ -108,7 +108,7 @@ func runMCPMode() {
 		Host:                       *host,
 		Verbose:                    *verbose,
 		AuthEnabled:                *authEnabled,
-		AuthSecretKey:              os.Getenv("GEMINI_AUTH_SECRET_KEY"),
+		AuthSecretKey:              os.Getenv("ANSWER_AUTH_SECRET_KEY"),
 		Heartbeat:                  *heartbeat,
 		DisableLocalhostProtection: disableLocalhostProtection,
 	})

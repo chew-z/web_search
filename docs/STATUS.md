@@ -44,16 +44,37 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   before this deploy the endpoint carried a secret but ran unauthenticated.
   Verified live on 2026-10-21: 401 challenge with `resource_metadata`, both discovery
   documents, `/health`, `/capabilities`, the full register → login → token → MCP →
-  refresh flow, static-JWT (`gemini-mcp` pair) interoperability, and bogus-token
-  rejection. Provider and keys come from the unit's `Environment=` block, not from
-  `.env` (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)).
+  refresh flow, static-JWT interoperability (on the `gemini-mcp` pair that commit still
+  used), and bogus-token rejection. Provider and keys come from the unit's `Environment=`
+  block, not from `.env` (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)).
   Deployment is manual: push, then on the VPS `git pull`, `task deps`,
   `task build`, restart the unit; nothing in this repository automates it.
   Outstanding: the claude.ai connector login itself (browser, owner's account).
+- **The GeminiMCP decouple below is committed but not on the box.** Production still runs
+  `7bc8225` with `GEMINI_AUTH_SECRET_KEY` and the `gemini-mcp` static pair.
+  Install the updated unit (`tmp/answer.service`: rotated secret,
+  `ANSWER_AUTH_SECRET_KEY`) _before_ restarting on the new commit — the old unit sets a
+  variable the new binary never reads, so startup fails validation.
+  After the restart every previously issued token is dead (the secret and the static pair
+  both changed): regenerate static tokens with `mcp -generate-token` and have connectors
+  log in again.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
-  version string in code is still `0.3.5` (config.go:24). No release since.
+  version string in code is still `0.3.5` (config.go:27). No release since.
 
 ## Recent changes
+
+### 2026-10-21 — decoupled from GeminiMCP
+
+- `ANSWER_AUTH_SECRET_KEY` replaces `GEMINI_AUTH_SECRET_KEY` in `main.go`, `config.go`,
+  `mcp_cli.go`, the staged unit, and the docs; the production secret was rotated at the same
+  time (`openssl rand -hex 32`), so the rename and the rotation land together.
+- The static JWT pair is now `answer-mcp` / `answer-mcp-user` (auth.go:17) instead of the
+  borrowed `gemini-mcp` / `gemini-mcp-user`. Nothing here needs GeminiMCP's issuer any more,
+  and a token minted for that service no longer opens this one.
+- `Claims` lost `user_id` and `role` — the guard only ever read the username, and the role
+  was unreachable (the OPEN_ITEMS defect this closes). `getUserInfo` / `identityOf` collapse
+  into `actorFrom(ctx)` over an `actorKey{}` context value.
+- Tests, `tmp/mktoken`, and the docs follow the new pair and variable.
 
 ### 2026-10-21 — OAuth 2.1 connector auth, mcp-go v1.3.0
 

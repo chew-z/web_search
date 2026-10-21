@@ -482,11 +482,7 @@ func TestExtractAnswer(t *testing.T) {
 func TestResolvePromptCacheKey(t *testing.T) {
 	t.Parallel()
 
-	authCtx := context.WithValue(context.Background(), userInfoKey, userInfo{
-		ID:       "user-42",
-		Username: "alice",
-		Role:     "user",
-	})
+	authCtx := context.WithValue(context.Background(), actorKey{}, "alice")
 
 	tests := []struct {
 		name     string
@@ -507,10 +503,10 @@ func TestResolvePromptCacheKey(t *testing.T) {
 			want:     serverName,
 		},
 		{
-			name:     "authenticated user shards by user id",
+			name:     "authenticated user shards by username",
 			ctx:      authCtx,
 			supplied: "",
-			want:     serverName + ":user-42",
+			want:     serverName + ":alice",
 		},
 		{
 			name:     "supplied still wins over auth identity",

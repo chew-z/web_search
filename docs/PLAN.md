@@ -68,8 +68,8 @@ runs on karma behind nginx, and documents the whole deployment in
 | --- | --- | --- |
 | OAuth scope | `answer` | Sibling convention is scope = service name (`pushover`, `alerts`). |
 | Realm | `answer-mcp` | Mirrors `pushover-mcp`. |
-| Static JWT issuer/audience | keep `gemini-mcp` / `gemini-mcp-user` | Existing tokens and GeminiMCP interoperability keep working. |
-| Signing secret env var | keep `GEMINI_AUTH_SECRET_KEY` | Must be ≥ 32 bytes once OAuth is on. |
+| Static JWT pair | ~~`gemini-mcp`~~ → `answer-mcp` / `answer-mcp-user` | Kept for interop at first, dropped post-deploy 2026-10-21. |
+| Signing secret | ~~`GEMINI_AUTH_SECRET_KEY`~~ → `ANSWER_AUTH_SECRET_KEY` | Rotated at the same time (`openssl rand -hex 32`). |
 | New env prefix | `ANSWER_MCP_*` | Consistent with `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION`. |
 | mcp-go | upgrade v0.56.0 → v1.3.0 as Phase 1 | Matches Pushover; sibling floor is v1.0.0 (PolCritique). |
 | Token expiry | `exp` becomes required on all bearers | Pushover guard uses `jwt.WithExpirationRequired()`. |
@@ -239,6 +239,24 @@ The edited `answer.service` and `karma.rrj.pl.conf` are staged in `tmp/`
       empty client ID/secret; complete the browser login and call `gpt_websearch`.
       (Owner's account and browser; optionally also the Claude Code `/mcp` login.)
 - [ ] Record the connector login in `docs/STATUS.md`; retire this plan to `docs/retired/`.
+
+### Post-deploy — decouple from GeminiMCP (2026-10-21)
+
+Supersedes the two struck decisions above; the Phase 3/8 checklists record what
+was true when they were done.
+
+- [x] `ANSWER_AUTH_SECRET_KEY` replaces `GEMINI_AUTH_SECRET_KEY` in code, flags,
+      errors, and docs; the production value is rotated, so no secret is shared
+      with the gemini service anymore.
+- [x] Static pair is `answer-mcp`/`answer-mcp-user`; `gemini-mcp` tokens no longer pass.
+- [x] `Claims` loses `user_id`/`role` (GeminiMCP's shape); the context identity is the
+      bare username (`actorFrom`), which is also the prompt-cache shard key. This
+      resolves the OPEN_ITEMS defect "`Claims.Role` is populated but unreachable".
+- [x] Staged unit updated (`tmp/answer.service`, new secret).
+- [ ] On karma: install the updated unit **before** restarting on this commit — the old
+      unit sets a variable the binary no longer reads, so startup fails validation.
+      Then re-run the verification curls and one static-token round trip
+      (`mcp -generate-token` with the new secret).
 
 ## Risks and notes
 

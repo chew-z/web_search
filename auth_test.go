@@ -153,9 +153,7 @@ func TestParseBearerToken(t *testing.T) {
 
 	baseClaims := func() Claims {
 		return Claims{
-			UserID:    "u-1",
 			Username:  "alice",
-			Role:      "user",
 			Issuer:    staticIssuer,
 			Audience:  jwt.ClaimStrings{staticAudience},
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -266,9 +264,7 @@ func TestProtectMCP(t *testing.T) {
 	makeClaimsToken := func(issuer, audience string, exp time.Time) string {
 		t.Helper()
 		return signTestToken(t, secret, Claims{
-			UserID:    "u-42",
 			Username:  "alice",
-			Role:      "admin",
 			Issuer:    issuer,
 			Audience:  jwt.ClaimStrings{audience},
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -382,12 +378,9 @@ func TestProtectMCP(t *testing.T) {
 			if capturedCtx == nil {
 				t.Fatalf("next handler context was not captured")
 			}
-			info, ok := capturedCtx.Value(userInfoKey).(userInfo)
-			if !ok {
-				t.Fatalf("context missing userInfo under userInfoKey")
-			}
-			if info.ID != "u-42" || info.Username != "alice" || info.Role != "admin" {
-				t.Fatalf("userInfo = %+v", info)
+			actor, ok := actorFrom(capturedCtx)
+			if !ok || actor != "alice" {
+				t.Fatalf("actorFrom = %q, %v; want alice", actor, ok)
 			}
 		})
 	}
@@ -437,10 +430,9 @@ func TestProtectMCPOAuthPair(t *testing.T) {
 		if rec.Result().StatusCode != http.StatusOK {
 			t.Fatalf("status = %d", rec.Result().StatusCode)
 		}
-		// OAuth tokens carry no user_id; the username doubles as the shard key.
-		id, username := getUserInfo(capturedCtx)
-		if id != "alice" || username != "alice" {
-			t.Fatalf("getUserInfo = %q, %q", id, username)
+		actor, ok := actorFrom(capturedCtx)
+		if !ok || actor != "alice" {
+			t.Fatalf("actorFrom = %q, %v; want alice", actor, ok)
 		}
 	})
 
@@ -493,10 +485,10 @@ func TestProtectMCPOAuthPair(t *testing.T) {
 	})
 }
 
-// TestUserInfoReachesToolContext proves the guard's identity survives mcp-go's
-// StreamableHTTP context construction: the tool handler must see the actor
+// TestActorReachesToolContext proves the guard's actor survives mcp-go's
+// StreamableHTTP context construction: the tool handler must see the username
 // that protectMCP authenticated.
-func TestUserInfoReachesToolContext(t *testing.T) {
+func TestActorReachesToolContext(t *testing.T) {
 	t.Parallel()
 
 	secret := "propagation-secret"
@@ -542,8 +534,8 @@ func TestUserInfoReachesToolContext(t *testing.T) {
 		t.Fatalf("call tool: %v", err)
 	}
 
-	id, username := getUserInfo(captured)
-	if id != "alice" || username != "alice" {
-		t.Fatalf("getUserInfo in tool context = %q, %q; want alice, alice", id, username)
+	actor, ok := actorFrom(captured)
+	if !ok || actor != "alice" {
+		t.Fatalf("actorFrom in tool context = %q, %v; want alice", actor, ok)
 	}
 }

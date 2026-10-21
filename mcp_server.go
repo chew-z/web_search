@@ -139,8 +139,8 @@ func webSearchHandler(apiKey, baseURL string, prov provider) func(context.Contex
 		start := time.Now()
 
 		// Log authenticated user when identity is available (HTTP transport).
-		if userID, username := getUserInfo(ctx); userID != "" {
-			logToClient(ctx, mcp.LoggingLevelDebug, "web_search", fmt.Sprintf("authenticated user: %s (%s)", username, userID))
+		if actor, ok := actorFrom(ctx); ok {
+			logToClient(ctx, mcp.LoggingLevelDebug, "web_search", fmt.Sprintf("authenticated user: %s", actor))
 		}
 
 		// Extract parameters

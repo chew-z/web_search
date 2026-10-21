@@ -15,17 +15,17 @@ tags: [operations, deployment, oauth]
 The server reads its provider API key and the auth/OAuth variables below;
 `MODEL`, `EFFORT`, `TIMEOUT`, `QUESTION`, `SHOW_ALL`, and `PROMPT_CACHE_KEY`
 are CLI-only — MCP callers pass the equivalent tool parameters.
-Loading lives in `config.go:126-151` (strict env parsing), `config.go:262-283`
-(`loadOAuthEnv`), and `main.go:76-95` (the one-shot credential commands).
+Loading lives in `config.go:126-151` (strict env parsing), `config.go:262-284`
+(`loadOAuthEnv`), and `main.go:74-82` (the one-shot credential commands).
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PROVIDER` | `openai` | Backend selector: `openai` or `deepseek`; the `-provider` flag wins. |
 | `OPENAI_API_KEY` | none; required for `openai` | OpenAI Responses API key. |
 | `DEEPSEEK_API_KEY` | none; required for `deepseek` | DeepSeek key. |
-| `GEMINI_AUTH_SECRET_KEY` | none | HS256 secret shared with GeminiMCP for token interoperability; required with `-auth-enabled`, ≥ 32 bytes with OAuth. |
+| `ANSWER_AUTH_SECRET_KEY` | none | Own HS256 signing secret for static and OAuth tokens; required with `-auth-enabled`, ≥ 32 bytes with OAuth. |
 | `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | `true` | Keeps mcp-go's DNS-rebinding check off; the proxy forwards the public `Host` header. |
-| `ANSWER_MCP_OAUTH` | `false` | Enable the OAuth 2.1 server; implies auth is enabled (`config.go:245-249`, `config.go:262-283`). |
+| `ANSWER_MCP_OAUTH` | `false` | Enable the OAuth 2.1 server; implies auth is enabled (`config.go:245-248`, `config.go:262-284`). |
 | `ANSWER_MCP_ISSUER` | none | Public OAuth issuer URL: `https://karma.rrj.pl/answer`. |
 | `ANSWER_MCP_RESOURCE` | none | Public protected-resource URL: `https://karma.rrj.pl/answer/mcp`. |
 | `ANSWER_MCP_LOGIN_USER` | none | Browser-login username. |
@@ -37,7 +37,7 @@ A malformed value in any boolean or duration variable stops startup with the
 variable name and the value (`config.go:126-151`).
 With OAuth on, startup also validates the issuer and resource as absolute URLs,
 the login user, the password-hash format, and the TTL ordering
-(`config.go:288-316`, `internal/oauth/config.go`).
+(`config.go:288-315`, `internal/oauth/config.go`).
 
 ## Build and deploy
 
@@ -61,7 +61,7 @@ executing `bin/answer mcp -port 8086 -transport http` with the provider and
 keys in the unit's `Environment=` block; deployment is a manual pull-and-build
 on the box (Build and deploy, above).
 The OAuth port needs no new flag — `ANSWER_MCP_OAUTH=true` switches the HTTP
-guard on by itself (`config.go:262-283`), which also closes the pre-OAuth
+guard on by itself (`config.go:262-284`), which also closes the pre-OAuth
 state where the unit carried a secret but ran without `-auth-enabled`.
 The unit shape, with placeholders for every credential:
 
@@ -81,7 +81,7 @@ StandardOutput=append:/var/log/Answer.log
 StandardError=append:/var/log/Answer.log
 Environment="PROVIDER=openai"
 Environment="OPENAI_API_KEY=<openai-key>"
-Environment="GEMINI_AUTH_SECRET_KEY=<at-least-32-random-bytes>"
+Environment="ANSWER_AUTH_SECRET_KEY=<openssl-rand-hex-32>"
 Environment="ANSWER_MCP_OAUTH=true"
 Environment="ANSWER_MCP_ISSUER=https://karma.rrj.pl/answer"
 Environment="ANSWER_MCP_RESOURCE=https://karma.rrj.pl/answer/mcp"
@@ -92,11 +92,13 @@ Environment="ANSWER_MCP_LOGIN_PASSWORD_HASH=<generated-password-hash>"
 WantedBy=multi-user.target
 ```
 
-Quote every `Environment=` value: the current signing secret contains `?`, `&`,
-and `+`, and an unquoted or unterminated value is silently dropped or mangled.
-Keep the existing `GEMINI_AUTH_SECRET_KEY` — it is exactly 32 bytes, which
-passes the OAuth minimum, and GeminiMCP mints interoperable tokens with it;
-rotating it would break every cross-service token at once.
+Quote every `Environment=` value: an unquoted or unterminated value containing
+shell metacharacters is silently dropped or mangled.
+`ANSWER_AUTH_SECRET_KEY` is this service's own signing secret, decoupled from
+GeminiMCP's on 2026-10-21; generate one with `openssl rand -hex 32` (64 hex
+characters — comfortably over the 32-byte OAuth minimum and free of characters
+any shell or parser treats specially). Rotating it invalidates every static
+token and every issued OAuth access token at once; connectors re-login.
 
 Generate the login hash interactively, then place stdout in
 `ANSWER_MCP_LOGIN_PASSWORD_HASH`:
@@ -170,13 +172,13 @@ curl -fsS -o /dev/null -w '%{http_code}\n' https://karma.rrj.pl/answer/capabilit
 ```
 
 The first command must return HTTP 401 with `WWW-Authenticate` containing
-`resource_metadata` (`auth.go:144-175`, `auth.go:200-206`).
+`resource_metadata` (`auth.go:131-162`, `auth.go:176-182`).
 The two discovery commands, health, and capabilities must return HTTP 200;
 the mux registers health and capabilities outside the guard
 (`transport.go:111-118`).
 A request carrying an existing static JWT must still succeed — the guard
-accepts the legacy `gemini-mcp`/`gemini-mcp-user` pair beside the OAuth pair
-(`auth.go:130-138`).
+accepts the static `answer-mcp`/`answer-mcp-user` pair beside the OAuth pair
+(`auth.go:117-123`).
 
 ## Connect from Claude
 
@@ -211,8 +213,8 @@ bin/answer mcp -generate-token -token-username <user> -token-ttl <duration>
 ```
 
 `-token-username` defaults to `admin`, and `-token-ttl` is a Go duration that
-defaults to `744h` (`main.go:48-51`, `mcp_cli.go:39-53`).
-It prints a static bearer token and requires only `GEMINI_AUTH_SECRET_KEY`.
+defaults to `744h` (`main.go:48-51`, `mcp_cli.go:40-51`).
+It prints a static bearer token and requires only `ANSWER_AUTH_SECRET_KEY`.
 Configure it as a header instead of using the OAuth-only entry:
 
 ```json
@@ -241,11 +243,11 @@ claude mcp remove answer -s local
 - A missing closing quote in a systemd `Environment=` line silently drops that variable.
 - Run `systemctl daemon-reload` after every unit-file edit and before restart.
 - OAuth configuration failures stop startup with an error that identifies the
-  invalid or absent value (`config.go:288-316`).
+  invalid or absent value (`config.go:288-315`).
 - Leave `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` at its default `true` behind
   the supplied nginx proxy; mcp-go would otherwise reject the forwarded public
   `Host` header as a DNS-rebinding risk (`transport.go`).
-- Every bearer now needs an `exp` claim (`auth.go:99-118`); tokens minted
+- Every bearer now needs an `exp` claim (`auth.go:86-102`); tokens minted
   without one stop validating — regenerate them with `-generate-token`.
 - OAuth state is in memory, so a restart logs connector sessions out once
   their access token expires and requires a new browser login

@@ -495,7 +495,7 @@ func TestMCPConfigValidate(t *testing.T) {
 		{
 			name:    "auth_requires_secret",
 			mutate:  func(c *MCPConfig) { c.OAuthEnabled, c.AuthSecretKey = false, "" },
-			wantErr: "GEMINI_AUTH_SECRET_KEY",
+			wantErr: "ANSWER_AUTH_SECRET_KEY",
 		},
 		{
 			name:    "oauth_requires_long_secret",

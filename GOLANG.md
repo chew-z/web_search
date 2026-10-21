@@ -74,7 +74,7 @@ the transport is `net/http` plus mcp-go, and there is no persistence.
 - **Environment variables are CLI-only, except two.** `MODEL`, `EFFORT`, `TIMEOUT`,
   `QUESTION`, `SHOW_ALL`, and `PROMPT_CACHE_KEY` are read only by the CLI path;
   MCP callers pass the equivalent tool parameters. Only `PROVIDER` and the API key
-  are read in both modes, plus `GEMINI_AUTH_SECRET_KEY`,
+  are read in both modes, plus `ANSWER_AUTH_SECRET_KEY`,
   `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION`, and the `ANSWER_MCP_*` OAuth set
   in MCP mode.
 - **Errors have two exit paths.** CLI failures return an `exitError` that `main` maps to

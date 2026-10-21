@@ -23,27 +23,24 @@ tags: [open-items]
   Owner: project owner.
 - **Which changelog is canonical?** `CHANGELOG.md` and `Release Notes.md` restate the same
   release history, both still list the multi-provider work as "Unreleased", and the
-  version in code is pinned at `0.3.5` (config.go:24).
+  version in code is pinned at `0.3.5` (config.go:27).
   Pick one file to maintain, or describe the release process in a rule.
   Owner: project owner.
 - **Two proposed rules are waiting on a yes or no.** Both were drafted but deliberately not
   written — rules are only added on approval — so say the word and they land.
   - `release.md`, scoped to `CHANGELOG.md`, `Release Notes.md`, and `config.go`: the version
-    lives in `serverVersion` (config.go:24) and in the changelog heading, both of which have
+    lives in `serverVersion` (config.go:27) and in the changelog heading, both of which have
     to move together; five GitHub releases exist (v0.1.0 … v0.3.5, tag plus notes, no binary
     asset) with no documented procedure, and the one script that claims to do it is stale.
   - `commits.md`, scoped to `**`: Conventional Commits, which every commit in the log
     already follows (`feat(transport): …`, `chore: …`). Recovered from `AGENTS.old.md`.
 
-## Defects
-
-- **`Claims.Role` is populated but unreachable** — `auth.go:44` declares it and
-  `identityOf` (auth.go:180) fills it from the token, but `getUserInfo` (auth.go:215)
-  returns only the user id and username, so nothing can read the role. Verified
-  2026-10-13, re-verified against the guard rework 2026-10-21.
-
 ## Debt
 
+- **2026-10-21 — two things are waiting on the box, not on the code**: the GeminiMCP decouple
+  has to be deployed (updated unit installed _before_ the restart, tokens regenerated) and the
+  claude.ai connector login still has to happen in a browser. Order and verification curls in
+  [STATUS.md](STATUS.md) and [OPERATIONS.md](OPERATIONS.md).
 - **2026-10-13 — no tagged release since v0.3.5 (2025-12-08)** while the code has moved
   through multi-provider support, json/v2 migration, and mcp-go v1.3.0.
 - **2026-10-21 — OAuth state is in-memory** (`oauth.NewStore(nil)`, transport.go:116):

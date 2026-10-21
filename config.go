@@ -301,11 +301,11 @@ func (c MCPConfig) OAuthConfig() (oauth.Config, error) {
 // Validate enforces the auth configuration rules at startup.
 func (c MCPConfig) Validate() error {
 	if c.AuthEnabled && c.AuthSecretKey == "" {
-		return errors.New("GEMINI_AUTH_SECRET_KEY must be set when authentication is enabled")
+		return errors.New("ANSWER_AUTH_SECRET_KEY must be set when authentication is enabled")
 	}
 	if c.OAuthEnabled {
 		if len(c.AuthSecretKey) < minOAuthSecretLen {
-			return fmt.Errorf("GEMINI_AUTH_SECRET_KEY must be at least %d bytes when OAuth is enabled", minOAuthSecretLen)
+			return fmt.Errorf("ANSWER_AUTH_SECRET_KEY must be at least %d bytes when OAuth is enabled", minOAuthSecretLen)
 		}
 		if _, err := c.OAuthConfig(); err != nil {
 			return fmt.Errorf("validate OAuth configuration: %w", err)
