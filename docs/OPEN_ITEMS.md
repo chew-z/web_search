@@ -37,16 +37,21 @@ tags: [open-items]
 
 ## Defects
 
-- **The README documents three HTTP endpoints that do not exist** — README.md:184-189
-  lists `GET /` (API documentation), `GET /health`, and `POST /message`, but the HTTP
-  transport mounts the MCP streamable handler at `/` and nothing else
-  (transport.go:26, transport.go:68). There is no health route and no `/message` route;
-  a JSON-RPC 2.0 payload goes to the MCP endpoint itself. Verified 2026-10-13.
-- **`Claims.Role` is populated but unreachable** — `auth.go:32` declares it and
-  `auth.go:124` fills it from the token, but `getUserInfo` (auth.go:132) returns only the
-  user id and username, so nothing can read the role. Verified 2026-10-13.
+- **`Claims.Role` is populated but unreachable** — `auth.go:44` declares it and
+  `identityOf` (auth.go:180) fills it from the token, but `getUserInfo` (auth.go:215)
+  returns only the user id and username, so nothing can read the role. Verified
+  2026-10-13, re-verified against the guard rework 2026-10-21.
 
 ## Debt
 
 - **2026-10-13 — no tagged release since v0.3.5 (2025-12-08)** while the code has moved
   through multi-provider support, json/v2 migration, and mcp-go v1.3.0.
+- **2026-10-21 — OAuth state is in-memory** (`oauth.NewStore(nil)`, transport.go:116):
+  a restart drops registered clients and refresh tokens, so connectors need a fresh
+  browser login once their access token expires, and an issued access token stays valid
+  until its `exp` no matter what — keep `ANSWER_MCP_ACCESS_TTL` short. The same trade-off
+  is accepted in Pushover and Alerts; see OPERATIONS.md troubleshooting.
+- **2026-10-21 — the karma deployment of the OAuth port is pending** (PLAN.md Phase 8):
+  unit `Environment=` additions, the atomic nginx edit (three new blocks plus removing
+  `answer` from the shared GET-denying alternation), the live verification curls, and the
+  claude.ai connector login. Until then production still runs the pre-OAuth build.

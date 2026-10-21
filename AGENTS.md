@@ -10,6 +10,7 @@ Read the file that matches the task before working, and store new guidance there
 | Where it stands: toolchain, health, recent changes | `docs/STATUS.md` |
 | Defects, debt, pending decisions (check before debugging) | `docs/OPEN_ITEMS.md` |
 | Current work plan (OAuth 2.1 connector auth port) | `docs/PLAN.md` |
+| Deployment, verification, connecting clients | `docs/OPERATIONS.md` |
 | Go conventions and house rules (read before editing Go) | `./GOLANG.md` |
 | Code navigation and diagnostics (gopls) | `./LSP.md` |
 | External package documentation (godoc MCP) | `./GODOC.md` |

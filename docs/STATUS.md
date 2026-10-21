@@ -29,11 +29,13 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
 
 ## Health
 
-- `task check` — green on 2026-10-13: `fmt:check`, `vet`, `lint:ci` (0 issues), `test:short`.
-- `task lint:md` — green on 2026-10-13.
+- `task check` — green on 2026-10-21: `fmt:check`, `vet`, `lint:ci` (0 issues), `test:short`;
+  `go test -race ./...` green the same day.
+- `task lint:md` — green on 2026-10-21.
 - Tests live beside the code as `*_test.go` and run without network access:
   `api_test.go`, `auth_test.go`, `config_test.go`, `deepseek_probe_test.go`,
-  `logging_test.go`, `main_test.go`, `mcp_server_test.go`, `models_test.go`.
+  `logging_test.go`, `main_test.go`, `mcp_cli_test.go`, `mcp_server_test.go`,
+  `models_test.go`, `oauth_e2e_test.go`, plus the vendored suite under `internal/oauth/`.
 - Production runs commit `f76d4fc` since 2026-10-13: the `answer.service` systemd unit on
   the VPS executes `bin/answer mcp -port 8086 -transport http`, served behind a reverse
   proxy at `karma.rrj.pl/answer/mcp` (`.mcp.json`), with
@@ -42,10 +44,35 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)); it was switched from
   `deepseek` to `openai` the same day and both were verified live.
   Deployment is a manual build-and-copy; nothing in this repository automates it.
+  **The OAuth port is not deployed yet** — production still runs the pre-OAuth build;
+  Phase 8 of [PLAN.md](PLAN.md) and [OPERATIONS.md](OPERATIONS.md) cover the rollout.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
   version string in code is still `0.3.5` (config.go:24). No release since.
 
 ## Recent changes
+
+### 2026-10-21 — OAuth 2.1 connector auth, mcp-go v1.3.0
+
+- mcp-go upgraded v0.56.0 → v1.3.0 (matches Pushover; the stateless 2026-07-28 protocol
+  core is supported but legacy initialize handshakes still negotiate, so clients are
+  unaffected); both transports smoked live after the bump.
+- `internal/oauth` vendored from Pushover (identical to the Alerts copy modulo naming):
+  OAuth 2.1 authorization server with RFC 9728/8414 discovery, dynamic registration
+  plus CIMD, PKCE S256, refresh families, PBKDF2 login, rate limiter, ceilinged store.
+  Scope `answer`, realm `answer-mcp`.
+- `auth.go` rebuilt on the sibling `authGuard` pattern: one HTTP-layer guard accepting the
+  legacy static pair (`gemini-mcp`/`gemini-mcp-user`, GeminiMCP-compatible) beside the
+  OAuth pair; 401 challenges carry `resource_metadata` so claude.ai connectors start the
+  browser login. `exp` is now required on every bearer; a 4 MiB body cap was added.
+- `ANSWER_MCP_*` env set, startup validation, and the `mcp -generate-token` /
+  `mcp -hash-password` credential CLIs (x/term added).
+- `/health` and `/capabilities` endpoints added (unauthenticated, Pushover parity).
+- Full e2e test walks discovery → register → login → token → refresh → MCP call;
+  mutation checks confirm the scope and challenge assertions bite.
+- Deploy artifacts staged, not yet installed: `deploy/nginx-answer.conf` and
+  [OPERATIONS.md](OPERATIONS.md) (env reference, discovery paths, verification curls,
+  Connect-from-Claude). `MCPConfigParams` collapsed into `MCPConfig`; the README endpoint
+  list was corrected.
 
 ### 2026-10-13 — model configuration refresh
 

@@ -22,19 +22,22 @@ Responses are capped at 10 MB (api.go:18).
 
 ## Components
 
-Everything is `package main` at the repository root; the split below is by concern, not by package.
+Everything is `package main` at the repository root except the vendored `internal/oauth`
+authorization server; the split below is by concern, not by package.
 
 | File | Reach | What it owns |
 | --- | --- | --- |
-| `main.go` | CLI + MCP entry | `main` routes on `os.Args[1] == "mcp"` (main.go:19); `runCLI`, CLI flags; `runMCPMode`, `runTransport`, `requireAuthSecret`. |
+| `main.go` | CLI + MCP entry | `main` routes on `os.Args[1] == "mcp"` (main.go:19); `runCLI`; `runMCPMode` (main.go:34) and the credential commands. |
 | `api.go` | shared | `CallAPI` (api.go:56), the one outbound HTTP call; `ExtractAnswer` (api.go:166); `HandleWebSearch` (api.go:223). |
 | `provider.go` | shared | The `provider` struct (provider.go:22) and `providerRegistry` (provider.go:33); lookups at provider.go:66, provider.go:80. |
-| `config.go` | shared | Constants and wire structs; `loadEnvConfig` (config.go:125), `validateEffort` (config.go:180), `parseMCPConfig` (config.go:216). |
+| `config.go` | shared | `loadEnvConfig` (config.go:155), `parseMCPConfig` (config.go:228), OAuth load and validation (config.go:262-316). |
 | `models.go` | shared | `effortRegistry` (models.go:20), `verbosityLevels` (models.go:29), `modelRegistry` (models.go:83), plus the schema helpers. |
 | `prompts.go` | MCP only | The two guidance prompts: `webSearchPrompt` (prompts.go:4) and `deepseekWebSearchPrompt` (prompts.go:124). |
 | `mcp_server.go` | MCP only | `NewMCPServer` (mcp_server.go:26), the tool/resource/prompt registrations and handlers, `logToClient`. |
-| `transport.go` | MCP only | `RunStdioTransport` (transport.go:19), `RunHTTPTransport` (transport.go:40), HTTP server timeouts. |
-| `auth.go` | MCP HTTP only | `validateJWT` (auth.go:51), `newAuthHTTPMiddleware` (auth.go:78), `getUserInfo` (auth.go:132). |
+| `transport.go` | MCP only | `RunHTTPTransport`, `buildHTTPHandler`: guarded MCP catch-all, `/health`, `/capabilities`, OAuth mount, timeouts. |
+| `auth.go` | MCP HTTP only | Token minting (auth.go:49-87), `parseBearerToken` (auth.go:99), guard `protectMCP` (auth.go:144), `getUserInfo` (auth.go:215). |
+| `mcp_cli.go` | MCP only | Credential helpers: `runGenerateToken` (mcp_cli.go:39), `runHashPassword` (mcp_cli.go:55), `readPassword` seam (mcp_cli.go:21). |
+| `internal/oauth/` | MCP HTTP only | Vendored OAuth 2.1 authorization server (Pushover copy); entry `Mount` (mount.go:9), design under Transport and auth. |
 | `logging.go` | both | A `slog` JSON logger on stderr, initialised by `initLogger` (logging.go:19), plus the `Debug`/`Info`/`Warn`/`Error` wrappers. |
 | `errors.go` | both | `ErrNoAPIKey`, `ErrInvalidProvider`, `APIError`, and the CLI-only `exitError` / `fail`. |
 
@@ -63,12 +66,15 @@ Everything is `package main` at the repository root; the split below is by conce
 
 ### MCP
 
-1. `runMCPMode` (main.go:35) parses flags from `os.Args[2:]`; `-transport` overrides `-t`
-   (main.go:64).
-2. Provider and API key come from `loadEnvConfig` (main.go:72); the JWT secret from
-   `requireAuthSecret` (main.go:79).
-3. `parseMCPConfig` (config.go:216) fills the remaining defaults, then `NewMCPServer`
-   (main.go:104) builds the server and `runTransport` (main.go:113) starts it.
+1. `runMCPMode` (main.go:34) parses flags from `os.Args[2:]`; `-transport` overrides `-t`.
+   The one-shot credential commands `-generate-token` and `-hash-password` run before any
+   provider or API-key loading and exit (main.go:76-95).
+2. Provider and API key come from `loadEnvConfig` (main.go:96); the JWT secret from
+   `GEMINI_AUTH_SECRET_KEY` (main.go:122) and the OAuth settings from `loadOAuthEnv`
+   (main.go:126, config.go:262). `Validate` (config.go:302) refuses startup on a missing
+   secret, a secret shorter than 32 bytes with OAuth on, or an invalid OAuth derivation.
+3. `parseMCPConfig` (config.go:228) fills the remaining defaults, then `NewMCPServer`
+   (main.go:136) builds the server and `runTransport` (main.go:144) starts it.
 
 Per tool call: `webSearchHandler` (mcp_server.go:137) → `HandleWebSearch` (api.go:223) →
 `CallAPI` → `ExtractAnswer` → a `WebSearchResult` returned as structured-only content
@@ -124,27 +130,43 @@ resources, prompts, recovery, and input/output schema validation enabled (mcp_se
 ## Transport and auth
 
 **stdio** is the default (`-t stdio`) and never authenticates: `RunStdioTransport` calls
-`server.ServeStdio` (transport.go:19).
+`server.ServeStdio` (transport.go:23).
 
 **HTTP** (`-t http`) runs a streamable-HTTP server on `-host:-port`, default
-`127.0.0.1:8080` (transport.go:40).
+`127.0.0.1:8080` (transport.go:52).
 Server timeouts are read 30s, write 15m (matching the `xhigh` budget), idle 120s
-(transport.go:12).
-`-heartbeat` sets the SSE heartbeat interval, default 30s, `0` disables it (main.go:47).
+(transport.go:16-20).
+`-heartbeat` sets the SSE heartbeat interval, default 30s, `0` disables it (main.go:46).
 `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` (default `true`) toggles mcp-go's DNS-rebinding
-protection, which is off because production runs behind a reverse proxy (main.go:85,
-transport.go:52).
+protection, which is off because production runs behind a reverse proxy (main.go:104,
+transport.go:87).
 
-JWT auth is opt-in via `-auth-enabled` and is HTTP-only (transport.go:62).
-`GEMINI_AUTH_SECRET_KEY` is then mandatory and the process refuses to start without it
-(main.go:133).
-`validateJWT` pins HS256, expects issuer `gemini-mcp` and audience `gemini-mcp-user`, and
-allows 60s of clock skew (auth.go:51); tokens are interchangeable with GeminiMCP.
-Failures return 401 with a machine-readable detail code: `missing_token`, `invalid_token`,
-`expired_token`, `token_not_valid_yet`, `malformed_token`, or `invalid_signature`
-(auth.go:112).
-On success the claims land in the request context (auth.go:121) and feed both the per-user
-cache key and handler logging.
+Bearer auth is opt-in via `-auth-enabled`, HTTP-only, and enforced at the HTTP layer before
+any MCP handshake (transport.go:105-112).
+The guard validates one HS256 JWT parse — `exp` required, 60s clock leeway, non-empty
+username (auth.go:99) — against two token profiles (auth.go:130):
+
+- the **static pair**: issuer `gemini-mcp`, audience `gemini-mcp-user`, no scope required;
+  interchangeable with GeminiMCP tokens, and minted by `mcp -generate-token`
+  (mcp_cli.go:39);
+- the **OAuth pair**: issuer `ANSWER_MCP_ISSUER`, audience `ANSWER_MCP_RESOURCE`, scope
+  `answer` required; minted by the vendored OAuth 2.1 authorization server, mounted beside
+  the MCP endpoint when `ANSWER_MCP_OAUTH=true` (transport.go:116) with RFC 9728/8414
+  discovery, RFC 7591 dynamic registration plus CIMD, authorization-code flow with PKCE
+  S256, a browser login against a PBKDF2-SHA256 hash, and rotating refresh tokens.
+  Its state is in-memory, so a restart eventually requires a fresh login.
+
+Failures return 401 with `WWW-Authenticate: Bearer realm="answer-mcp"` and an error code;
+with OAuth enabled the challenge carries `resource_metadata` and `scope` (auth.go:200-206) —
+the RFC 9728 trigger that starts claude.ai's connector login.
+A valid token with the wrong scope gets 403 `insufficient_scope`.
+Request bodies are capped at 4 MiB (auth.go:22) and OPTIONS preflight passes unauthenticated
+(auth.go:146-150).
+On success the claims land in the request context as `userInfo` (auth.go:168, auth.go:180)
+and feed the per-user cache key and handler logging; mcp-go derives the tool context from
+the request context, so the identity reaches tool handlers.
+`/health` and `/capabilities` serve unauthenticated operator metadata
+(transport.go:113-114).
 
 ## Configuration
 
@@ -163,8 +185,15 @@ import (main.go:13).
 | `SHOW_ALL` | default for `-show-all` (config.go:142) | CLI | `false` |
 | `TIMEOUT` | default for `-timeout` (config.go:149) | CLI | effort-derived |
 | `PROMPT_CACHE_KEY` | default for `-cache-key` (main.go:190) | CLI | — |
-| `GEMINI_AUTH_SECRET_KEY` | HTTP JWT secret (main.go:134) | MCP | required with `-auth-enabled` |
-| `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | DNS-rebinding protection (main.go:86) | MCP | `true` (protection off) |
+| `GEMINI_AUTH_SECRET_KEY` | HTTP JWT signing and validation secret (main.go:122) | MCP | required with `-auth-enabled`; ≥ 32 bytes with OAuth |
+| `ANSWER_HTTP_DISABLE_LOCALHOST_PROTECTION` | DNS-rebinding protection (main.go:104) | MCP | `true` (protection off) |
+| `ANSWER_MCP_OAUTH` | enable the OAuth 2.1 server; implies auth (config.go:262) | MCP | `false` |
+| `ANSWER_MCP_ISSUER` | public OAuth issuer URL (config.go:274) | MCP | — |
+| `ANSWER_MCP_RESOURCE` | public protected-resource URL (config.go:275) | MCP | — |
+| `ANSWER_MCP_LOGIN_USER` | browser-login username (config.go:276) | MCP | — |
+| `ANSWER_MCP_LOGIN_PASSWORD_HASH` | PBKDF2 hash from `mcp -hash-password` (config.go:277) | MCP | — |
+| `ANSWER_MCP_ACCESS_TTL` | OAuth access-token lifetime (config.go:278) | MCP | `1h` |
+| `ANSWER_MCP_REFRESH_TTL` | OAuth refresh-token lifetime (config.go:281) | MCP | `720h` |
 
 MCP mode ignores `MODEL`, `EFFORT`, `TIMEOUT`, `QUESTION`, `SHOW_ALL`, and
 `PROMPT_CACHE_KEY` — they are read only by the CLI path.
@@ -179,7 +208,9 @@ are defined in `parseCLIArgs` (main.go:169).
 ### MCP flags
 
 `-t` / `-transport`, `-port`, `-host`, `-base`, `-provider`, `-verbose`, `-auth-enabled`,
-and `-heartbeat` (main.go:36).
+and `-heartbeat` (main.go:36), plus the one-shot credential commands `-generate-token` /
+`-token-username` / `-token-ttl` and `-hash-password` (main.go:48-51), which print and exit
+before any provider loading.
 
 ### Effort and timeout
 
@@ -226,8 +257,9 @@ A non-empty `text.verbosity` is mandatory — DeepSeek rejects an empty string w
 | Module | Version | Used for |
 | --- | --- | --- |
 | `github.com/mark3labs/mcp-go` | v1.3.0 | The MCP server (`server`, main.go:14) and MCP types (`mcp`, api.go:15). |
-| `github.com/golang-jwt/jwt/v5` | v5.3.1 | HS256 validation of the HTTP bearer token (auth.go:11). |
+| `github.com/golang-jwt/jwt/v5` | v5.3.1 | HS256 bearer-token signing and validation (auth.go). |
 | `github.com/joho/godotenv` | v1.5.1 | Blank autoload import that reads `.env` (main.go:13). |
+| `golang.org/x/term` | v0.47.0 | Silent password read for `mcp -hash-password` (mcp_cli.go:21). |
 
 `google/jsonschema-go` (pulled in by `mcp.WithOutputSchema[WebSearchResult]`,
 mcp_server.go:127), `google/uuid`, `santhosh-tekuri/jsonschema/v6`, `spf13/cast`,

@@ -186,25 +186,29 @@ Do this first and alone, so later breakage is unambiguous.
 
 ### Phase 7 — deployment artifacts and docs
 
-- [ ] `deploy/nginx-answer.conf` modeled on `deploy/nginx-pushover.conf`:
+- [x] `deploy/nginx-answer.conf` modeled on `deploy/nginx-pushover.conf`:
       exact locations for `/.well-known/oauth-protected-resource/answer/mcp` and
       `/.well-known/oauth-authorization-server/answer`,
       plus `^~ /answer/` stripping the prefix to `http://127.0.0.1:8086/`,
       GET allowed, `client_max_body_size 4m`, buffering off, long read/send timeouts,
       `X-Forwarded-For` overwritten with `$remote_addr`.
-- [ ] systemd unit example: `ANSWER_MCP_OAUTH=true`,
-      `ANSWER_MCP_ISSUER=https://karma.rrj.pl/answer`,
-      `ANSWER_MCP_RESOURCE=https://karma.rrj.pl/answer/mcp`,
-      `ANSWER_MCP_LOGIN_USER`, `ANSWER_MCP_LOGIN_PASSWORD_HASH` (from `-hash-password`),
-      TTLs at defaults.
-- [ ] `docs/OPERATIONS.md` (new, mirroring Pushover's): env reference, discovery paths,
+- [x] systemd unit `Environment=` additions documented in OPERATIONS.md
+      (the unit on the box stays the source of truth for paths):
+      `ANSWER_MCP_OAUTH=true`, `ANSWER_MCP_ISSUER=https://karma.rrj.pl/answer`,
+      `ANSWER_MCP_RESOURCE=https://karma.rrj.pl/answer/mcp`, login user + hash from
+      `-hash-password`, TTLs at defaults.
+- [x] `docs/OPERATIONS.md` (new, mirroring Pushover's): env reference, discovery paths,
       post-deploy verification curls, and Connect-from-Claude for all three client shapes —
       claude.ai custom connector (empty client ID/secret, dynamic registration, browser login),
       header-less `.mcp.json` entry (OAuth login via `/mcp` in Claude Code),
       and the existing static-JWT header entry.
-- [ ] Update `docs/ARCHITECTURE.md` (auth design), `docs/STATUS.md`, `docs/OPEN_ITEMS.md`;
-      add `AGENTS.md` / `CLAUDE.md` map rows for this plan and OPERATIONS.
-- [ ] Gate: `task lint:md` green.
+- [x] `docs/ARCHITECTURE.md` rewritten for the guard model (components, MCP data flow,
+      transport/auth, env table, flags, dependencies); `docs/STATUS.md` health and a
+      2026-10-21 entry; `docs/OPEN_ITEMS.md` — README-endpoints defect resolved and
+      removed, `Claims.Role` citations refreshed, in-memory-store and pending-deploy debt
+      added; README endpoints/structure corrected; `AGENTS.md` / `CLAUDE.md` map rows for
+      OPERATIONS.
+- [x] Gate: `task lint:md` green.
 
 ### Phase 8 — karma deployment and live verification
 

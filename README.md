@@ -181,12 +181,21 @@ To use DeepSeek instead, add `"PROVIDER": "deepseek"` and set `DEEPSEEK_API_KEY`
 
 **Endpoints:**
 
-- `GET /` - API documentation
-- `GET /health` - Health check
+- `POST` on any path (conventionally `/mcp`) — the MCP streamable HTTP endpoint (JSON-RPC 2.0);
+  the handler routes by method, so prefix-forwarding proxies work unchanged.
+- `GET /health` — health check (unauthenticated).
+- `GET /capabilities` — server, tool, and authentication metadata (unauthenticated).
+- With `ANSWER_MCP_OAUTH=true`, additionally: `GET /authorize`, `GET`/`POST /login`,
+  `POST /token`, `POST /register`, and the RFC 9728 / RFC 8414 `/.well-known/...`
+  discovery documents.
 
-- `POST /message` - Message handling endpoint
-
-**Note:** `POST /message` is for sending requests to the MCP server (JSON-RPC 2.0 payload).
+**Authentication (HTTP transport):** opt-in with `-auth-enabled`; requests then need
+`Authorization: Bearer <JWT>` (HS256, signed with `GEMINI_AUTH_SECRET_KEY`).
+Two token profiles are accepted: static tokens minted with
+`./bin/answer mcp -generate-token` (interchangeable with GeminiMCP), and OAuth 2.1 access
+tokens from the browser login that claude.ai connectors start automatically from the 401
+challenge. Deployment, connector setup, and verification runbook:
+[docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## MCP Server Features
 
@@ -344,10 +353,15 @@ Answer/
 ├── prompts.go           # Per-provider MCP guidance prompts
 ├── models.go            # Effort and model registries
 ├── config.go            # Configuration structures and helpers
-├── transport.go         # stdio/HTTP transports
-├── auth.go              # JWT auth for HTTP transport
+├── transport.go         # stdio/HTTP transports, /health, /capabilities, OAuth mount
+├── auth.go              # JWT guard: static + OAuth token pairs
+├── mcp_cli.go           # Credential CLIs: -generate-token, -hash-password
 ├── logging.go           # Structured logging
 ├── errors.go            # Error definitions
+├── internal/
+│   └── oauth/           # Vendored OAuth 2.1 authorization server
+├── deploy/
+│   └── nginx-answer.conf # karma nginx blocks for OAuth + MCP
 ├── go.mod               # Go module definition
 ├── .env                 # Environment variables (not committed)
 ├── bin/
@@ -359,13 +373,13 @@ Answer/
 ### Building
 
 ```bash
-task build   # preferred; or: GOEXPERIMENT=jsonv2 go build -o bin/answer .
+task build   # preferred; or: go build -o bin/answer .
 ```
 
 ### Testing
 
 ```bash
-task test    # preferred; or: GOEXPERIMENT=jsonv2 go test ./...
+task test    # preferred; or: go test ./...
 ```
 
 ### Formatting
