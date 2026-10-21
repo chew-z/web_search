@@ -36,7 +36,7 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   `api_test.go`, `auth_test.go`, `config_test.go`, `deepseek_probe_test.go`,
   `logging_test.go`, `main_test.go`, `mcp_cli_test.go`, `mcp_server_test.go`,
   `models_test.go`, `oauth_e2e_test.go`, plus the vendored suite under `internal/oauth/`.
-- Production runs commit `4b0dd95` since 2026-10-21, with OAuth on: the `answer.service`
+- Production runs commit `11f354d` since 2026-10-21, with OAuth on: the `answer.service`
   systemd unit executes `bin/answer mcp -port 8086 -transport http` from the repo checkout
   at `/home/debian/Go/src/Answer`, behind nginx at `karma.rrj.pl/answer/mcp` with the
   three blocks from `deploy/nginx-answer.conf` (the shared GET-denying alternation no
@@ -55,7 +55,11 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   `task build`, restart the unit; nothing in this repository automates it.
   A unit-file change goes up _before_ the restart, or startup fails validation on a
   variable the new binary no longer reads.
-  Outstanding: the claude.ai connector login itself (browser, owner's account).
+  The claude.ai connector is connected: added with URL `https://karma.rrj.pl/answer/mcp`
+  and empty client ID/secret (dynamic registration), browser login completed by the owner
+  on 2026-10-21. The production `tools/list` at `11f354d` also confirms the corrected
+  annotations. Nothing is outstanding on the OAuth port; the plan is retired to
+  `docs/retired/PLAN.md`.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
   version string in code is still `0.3.5` (config.go:27). No release since.
 
@@ -69,8 +73,8 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   search as `readOnlyHint: false, destructiveHint: true` — which makes clients gate it behind
   approval prompts. Spotted in the production `tools/list` response during the decouple
   verification. Asserted in `TestGptWebsearch_ToolsList_SchemaShape`.
-- Committed after `4b0dd95`, so it needs one more rebuild-and-restart on karma; no unit or
-  nginx change.
+- Shipped as `11f354d` and live on karma: the production `tools/list` returns
+  `readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true`.
 
 ### 2026-10-21 — decoupled from GeminiMCP
 

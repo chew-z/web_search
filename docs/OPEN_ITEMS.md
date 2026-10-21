@@ -37,11 +37,6 @@ tags: [open-items]
 
 ## Debt
 
-- **2026-10-21 — the claude.ai connector login still has to happen in a browser** (owner's
-  account). Everything else from the OAuth port and the GeminiMCP decouple is deployed and
-  verified live at `4b0dd95`. Static tokens minted before the decouple are dead — regenerate
-  with `mcp -generate-token`. The tool-annotation fix landed after that commit and needs one
-  more rebuild-and-restart (no unit or nginx change).
 - **2026-10-13 — no tagged release since v0.3.5 (2025-12-08)** while the code has moved
   through multi-provider support, json/v2 migration, and mcp-go v1.3.0.
 - **2026-10-21 — OAuth state is in-memory** (`oauth.NewStore(nil)`, transport.go:116):
