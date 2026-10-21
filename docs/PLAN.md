@@ -213,6 +213,9 @@ Do this first and alone, so later breakage is unambiguous.
 ### Phase 8 — karma deployment and live verification
 
 Manual build-and-copy, as today; nothing here automates it.
+A full local dress rehearsal passed against the built binary on 2026-10-21:
+register → branded login page → code → token → authenticated MCP initialize
+→ refresh → wrong-password rejection, all via curl on karma-shaped paths.
 
 - [ ] Build, copy the binary, update the unit's `Environment=` block, restart `answer.service`.
 - [ ] Edit karma's nginx **atomically**: add the three blocks and remove `answer` from the
