@@ -49,7 +49,7 @@ This project is a flat `package main` at the root; every file is listed in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#components).
 
 - `github.com/mark3labs/mcp-go` — the MCP server (`server`) and MCP types (`mcp`).
-  Version 0.56.0.
+  Version 1.3.0.
 - `github.com/golang-jwt/jwt/v5` — HS256 bearer-token validation for the HTTP transport.
 - `github.com/joho/godotenv/autoload` — blank import in `main.go` that loads `.env`
   before `main` runs.

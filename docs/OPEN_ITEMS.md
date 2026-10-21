@@ -51,4 +51,4 @@ tags: [open-items]
 - **2026-10-13 — `MCPConfigParams` duplicates `MCPConfig` field-for-field** (config.go:96,
   config.go:198). Intentional today; worth collapsing if a third field ever needs adding.
 - **2026-10-13 — no tagged release since v0.3.5 (2025-12-08)** while the code has moved
-  through multi-provider support, json/v2 migration, and mcp-go v0.56.0.
+  through multi-provider support, json/v2 migration, and mcp-go v1.3.0.

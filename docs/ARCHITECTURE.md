@@ -225,7 +225,7 @@ A non-empty `text.verbosity` is mandatory — DeepSeek rejects an empty string w
 
 | Module | Version | Used for |
 | --- | --- | --- |
-| `github.com/mark3labs/mcp-go` | v0.56.0 | The MCP server (`server`, main.go:14) and MCP types (`mcp`, api.go:15). |
+| `github.com/mark3labs/mcp-go` | v1.3.0 | The MCP server (`server`, main.go:14) and MCP types (`mcp`, api.go:15). |
 | `github.com/golang-jwt/jwt/v5` | v5.3.1 | HS256 validation of the HTTP bearer token (auth.go:11). |
 | `github.com/joho/godotenv` | v1.5.1 | Blank autoload import that reads `.env` (main.go:13). |
 
@@ -235,16 +235,21 @@ mcp_server.go:127), `google/uuid`, `santhosh-tekuri/jsonschema/v6`, `spf13/cast`
 
 ## Known constraints
 
-Carried over from the mcp-go v0.37→v0.52 migration report (now retired in `docs/retired/`);
-they still hold on v0.56.0.
+Re-checked against mcp-go v1.3.0 on 2026-10-21; the list descends from the
+v0.37→v0.52 migration report (retired in `docs/retired/`).
 
-- `AddTaskTool` is async-only and answers non-task clients with `-32601`, so the server
-  does not expose tasks — Claude Code and Claude Desktop do not speak `tasks/*`.
-- `WithInputSchemaValidation` does not fire for task-augmented calls.
-- A task's goroutine context is tied to the HTTP request lifecycle, so long-running tasks
-  need a long-lived GET SSE stream.
-- `server.WithLogger` is a `StreamableHTTPOption`, not a `ServerOption`.
-- `util.Logger` requires only `Infof` and `Errorf`.
+- The server exposes no task tools. The v0.x `AddTaskTool` behavior (async-only,
+  `-32601` for non-task clients, schema validation skipped for task-augmented calls,
+  goroutine context tied to the HTTP request lifecycle) changed in v1.x — the `-32601`
+  path is gone from the server package — so re-check all of it before ever exposing tasks.
+  Claude Code and Claude Desktop do not speak `tasks/*` anyway.
+- `server.WithLogger` is a `ServerOption` taking `*slog.Logger` (server/logger.go:47);
+  the streamable transport takes its own `WithStreamableHTTPLogger`
+  (server/streamable_http.go:180), which is what this project uses (transport.go:56).
+- The v0.x `util` package and its `Logger` adapter are gone in v1.x.
+- v1.x speaks the stateless 2026-07-28 protocol core, but the initialize handshake
+  still negotiates legacy versions up to 2025-11-25 (mcp/version.go), so existing
+  clients are unaffected.
 
 ## Naming gotcha
 
