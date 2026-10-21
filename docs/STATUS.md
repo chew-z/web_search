@@ -43,7 +43,8 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   The provider comes from the unit's `Environment=` block, not from `.env`
   (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)); it was switched from
   `deepseek` to `openai` the same day and both were verified live.
-  Deployment is a manual build-and-copy; nothing in this repository automates it.
+  Deployment is manual: push, then on the VPS `git pull`, `task deps`,
+  `task build`, restart the unit; nothing in this repository automates it.
   **The OAuth port is not deployed yet** — production still runs the pre-OAuth build;
   Phase 8 of [PLAN.md](PLAN.md) and [OPERATIONS.md](OPERATIONS.md) cover the rollout.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the

@@ -39,13 +39,17 @@ With OAuth on, startup also validates the issuer and resource as absolute URLs,
 the login user, the password-hash format, and the TTL ordering
 (`config.go:288-316`, `internal/oauth/config.go`).
 
-## Build
+## Build and deploy
 
-```sh
-task build
-```
+The VPS builds natively from the repository checkout — nothing is
+cross-compiled and no binary is ever copied between machines (the dev box is
+macOS/arm64; its `bin/answer` would not execute on karma):
 
-The output is `bin/answer`.
+1. Push `main` to origin.
+2. On karma, in `/home/debian/Go/src/Answer`: `git pull`.
+3. `task deps` (downloads and verifies modules), then `task build` → `bin/answer`.
+4. `sudo systemctl restart answer`.
+
 Do not use `go install`: the module path `github.com/chew-z/web_search`
 produces a `web_search` binary (see the naming gotcha in
 [ARCHITECTURE.md](ARCHITECTURE.md#naming-gotcha)).
@@ -54,7 +58,8 @@ produces a `web_search` binary (see the naming gotcha in
 
 Production runs `answer.service` on karma from `/home/debian/Go/src/Answer`,
 executing `bin/answer mcp -port 8086 -transport http` with the provider and
-keys in the unit's `Environment=` block; deployment is a manual build-and-copy.
+keys in the unit's `Environment=` block; deployment is a manual pull-and-build
+on the box (Build and deploy, above).
 The OAuth port needs no new flag — `ANSWER_MCP_OAUTH=true` switches the HTTP
 guard on by itself (`config.go:262-283`), which also closes the pre-OAuth
 state where the unit carried a secret but ran without `-auth-enabled`.

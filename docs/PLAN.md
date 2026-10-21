@@ -212,12 +212,18 @@ Do this first and alone, so later breakage is unambiguous.
 
 ### Phase 8 — karma deployment and live verification
 
-Manual build-and-copy, as today; nothing here automates it.
+The VPS builds natively from its checkout: push `main`, then on karma
+`git pull` in `/home/debian/Go/src/Answer`, `task deps`, `task build`,
+restart `answer.service`. Nothing here automates it.
 A full local dress rehearsal passed against the built binary on 2026-10-21:
 register → branded login page → code → token → authenticated MCP initialize
 → refresh → wrong-password rejection, all via curl on karma-shaped paths.
+The edited `answer.service` and `karma.rrj.pl.conf` are staged in `tmp/`
+(gitignored; they carry live credentials — handle with care).
 
-- [ ] Build, copy the binary, update the unit's `Environment=` block, restart `answer.service`.
+- [ ] Push `main`; on karma pull, `task deps`, `task build`.
+- [ ] Install the edited unit (`tmp/answer.service` → `/etc/systemd/system/`),
+      `daemon-reload`, restart `answer.service`.
 - [ ] Edit karma's nginx **atomically**: add the three blocks and remove `answer` from the
       shared `location ~ ^/(?:answer|gemini|time)/(.*)$` alternation and the `$mcp_backend`
       map in the same change — that block denies GET and `/authorize` is a browser GET.

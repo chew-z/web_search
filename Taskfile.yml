@@ -90,6 +90,12 @@ tasks:
     cmds:
       - markdownlint-cli2 "**/*.md"
 
+  deps:
+    desc: Download and verify module dependencies
+    cmds:
+      - go mod download
+      - go mod verify
+
   tidy:
     desc: Tidy and verify module dependencies
     cmds:
