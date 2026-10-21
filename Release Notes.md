@@ -1,9 +1,44 @@
 # Release Notes
 
-## Unreleased
+## v0.4.0 - October 21, 2026
+
+### 💥 Breaking Changes
+
+- **Authentication Is Self-Contained:**
+  - `GEMINI_AUTH_SECRET_KEY` is no longer read. Set `ANSWER_AUTH_SECRET_KEY` instead — at least 32 bytes
+    when OAuth is enabled. Nothing is shared with the GeminiMCP service any more, and the production
+    secret was rotated as part of the change.
+  - The static token pair is now issuer `answer-mcp` with audience `answer-mcp-user`, replacing
+    `gemini-mcp` / `gemini-mcp-user`. Tokens minted for the old pair are rejected with 401; regenerate them
+    with `answer mcp -generate-token`.
+  - Every bearer token now needs an `exp` claim, and the `user_id` and `role` claims are gone: the
+    authenticated username travels as a request-context value and shards the OpenAI prompt cache per user.
 
 ### 🎉 New Features
 
+- **OAuth 2.1 Connector Authentication:**
+  - A vendored, standard-library-only authorization server (`internal/oauth`) brings RFC 9728
+    protected-resource metadata, RFC 8414 authorization-server metadata, RFC 7591 dynamic registration with
+    client-ID metadata documents, the authorization-code flow with PKCE S256, rotating refresh-token
+    families, a PBKDF2-SHA256 browser login, and a rate limiter.
+  - claude.ai, Claude Desktop, and Claude mobile connectors log in with an empty client ID and secret:
+    the 401 challenge carries `resource_metadata`, which is what starts the browser flow.
+  - Configured through `ANSWER_MCP_OAUTH`, `ANSWER_MCP_ISSUER`, `ANSWER_MCP_RESOURCE`,
+    `ANSWER_MCP_LOGIN_USER`, `ANSWER_MCP_LOGIN_PASSWORD_HASH`, and the two TTL variables. Scope `answer`,
+    realm `answer-mcp`. State is in-memory, so a restart eventually asks connectors to log in again.
+- **Operator Endpoints:**
+  - Unauthenticated `/health` for liveness probes and `/capabilities` for server info, the tool list, and
+    the auth mode — both mounted outside the guard.
+- **Credential Command-Line Helpers:**
+  - `answer mcp -generate-token [-token-username <user>] [-token-ttl <duration>]` mints a static bearer
+    token (default lifetime 744h).
+  - `answer mcp -hash-password` produces the PBKDF2-SHA256 hash for `ANSWER_MCP_LOGIN_PASSWORD_HASH`,
+    reading the password silently from a TTY.
+- **Tool Annotations:**
+  - `gpt_websearch` now advertises a title plus `readOnlyHint: true`, `destructiveHint: false`,
+    `idempotentHint: true`, and `openWorldHint: true`. Without them the library emitted the MCP spec
+    defaults, so clients were told a read-only web search is destructive and gated it behind approval
+    prompts.
 - **Multi-Provider Support:**
   - Choose between OpenAI (`openai`, default) and DeepSeek (`deepseek`) backends via the `PROVIDER` environment variable
     or the `-provider` flag (CLI and MCP modes).
@@ -14,6 +49,25 @@
 
 ### 🔧 Improvements
 
+- **mcp-go v0.56.0 → v1.3.0:**
+  - Brings the stateless 2026-07-28 protocol core while legacy initialize handshakes still negotiate, so
+    existing clients are unaffected. Both transports were verified live after the bump.
+- **One Authentication Guard:**
+  - A single HTTP-layer guard validates one HS256 parse — signing method pinned against algorithm
+    confusion, 60 seconds of clock leeway, non-empty username — against the static and OAuth token
+    profiles.
+  - Failures return 401 with a `WWW-Authenticate` challenge carrying `realm`, `error`, and (with OAuth on)
+    `resource_metadata` and `scope`; a valid token with the wrong scope gets 403 `insufficient_scope`.
+  - Request bodies are capped at 4 MiB and OPTIONS preflight passes unauthenticated, per the CORS spec.
+- **Strict Configuration and Startup Validation:**
+  - `ANSWER_MCP_*` booleans and durations are parsed strictly, and a malformed value stops startup with the
+    variable name and the offending value.
+  - With OAuth on, startup validates the issuer and resource as absolute URLs, the login user, the
+    password-hash format, the secret length, and the TTL ordering. `MCPConfigParams` collapsed into
+    `MCPConfig`.
+- **Go 1.27:**
+  - The `go` directive moved to 1.27.0 and `encoding/json/v2` is used directly, so `GOEXPERIMENT=jsonv2` is
+    gone from the Taskfile and the run wrappers; the `go fix` modernizers were applied across the tree.
 - **Cleaner Answers:**
   - Answer extraction now strips intermediate narration messages emitted before/between tool calls
     (observed with DeepSeek), returning only the final answer text.
@@ -24,7 +78,14 @@
 
 ### 📚 Documentation
 
-- Updated README, AGENTS.md, and CLAUDE.md for multi-provider configuration, model guidance, and the refreshed build/test workflow (`task` + `GOEXPERIMENT=jsonv2`).
+- **Role Docs:**
+  - `docs/ARCHITECTURE.md` (design), `docs/STATUS.md` (health and recent changes), and
+    `docs/OPEN_ITEMS.md` (defects, debt, pending decisions) are kept current against the code, with
+    `file:line` citations re-verified.
+  - `docs/OPERATIONS.md` is the deployment runbook: the karma systemd unit, the nginx blocks shipped as
+    `deploy/nginx-answer.conf`, discovery paths, verification curls, connector setup, and secret rotation.
+- Updated README, AGENTS.md, and CLAUDE.md for multi-provider configuration, model guidance, OAuth, and the
+  `task`-based build and gate workflow (`task check`).
 
 ## v0.3.5 - December 08, 2025
 

@@ -24,7 +24,7 @@ const (
 	// Server metadata
 	serverName       = "gpt-websearch-mcp"
 	serverTitle      = "GPT Web Search"
-	serverVersion    = "0.3.5"
+	serverVersion    = "0.4.0"
 	serverWebsiteURL = "https://github.com/chew-z/web_search"
 
 	// Timeouts based on reasoning effort.

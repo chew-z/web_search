@@ -60,10 +60,25 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   on 2026-10-21. The production `tools/list` at `11f354d` also confirms the corrected
   annotations. Nothing is outstanding on the OAuth port; the plan is retired to
   `docs/retired/PLAN.md`.
-- Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
-  version string in code is still `0.3.5` (config.go:27). No release since.
+- Releases: v0.4.0 (2026-10-21) is the latest tag and matches `serverVersion` (config.go:27). It covers
+  everything since v0.3.5 — multi-provider support, the Go 1.27 and json/v2 move, mcp-go v1.3.0, the
+  OAuth 2.1 connector auth, and the GeminiMCP decouple. Both `CHANGELOG.md` and `Release Notes.md` carry
+  the section; the GitHub release body is the long-form one. The bump itself is not on the box yet, so
+  production `/capabilities` still reports `0.3.5` until the next rebuild-and-restart.
 
 ## Recent changes
+
+### 2026-10-21 — v0.4.0 released
+
+- `serverVersion` moved `0.3.5` → `0.4.0` (config.go:27), the first release since 2025-12-08.
+- Both changelogs gained the v0.4.0 section — `CHANGELOG.md` in its terse flat style,
+  `Release Notes.md` in the long-form nested style that GitHub release bodies are cut from —
+  with a 💥 Breaking Changes section for the auth-secret rename, the new static token pair, the
+  required `exp` claim, and the slimmed claims.
+- Tagged `v0.4.0` (annotated, matching the existing tags) and published as a GitHub release with
+  no binary asset, as before.
+- Scratch helpers under `tmp/` from the deployment verification were removed; `mcp -generate-token`
+  and `mcp -hash-password` cover the same ground from the shipped binary.
 
 ### 2026-10-21 — tool annotations set explicitly
 

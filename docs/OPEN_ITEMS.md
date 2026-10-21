@@ -22,23 +22,22 @@ tags: [open-items]
   was copy-pasted and says fixing it is out of scope. `task release` supersedes it.
   Owner: project owner.
 - **Which changelog is canonical?** `CHANGELOG.md` and `Release Notes.md` restate the same
-  release history, both still list the multi-provider work as "Unreleased", and the
-  version in code is pinned at `0.3.5` (config.go:27).
+  release history in two shapes — terse flat bullets versus long-form nested ones — and both
+  had to be written for v0.4.0. The GitHub release body is the `Release Notes.md` section,
+  which is the only reason that file still exists.
   Pick one file to maintain, or describe the release process in a rule.
   Owner: project owner.
 - **Two proposed rules are waiting on a yes or no.** Both were drafted but deliberately not
   written — rules are only added on approval — so say the word and they land.
   - `release.md`, scoped to `CHANGELOG.md`, `Release Notes.md`, and `config.go`: the version
     lives in `serverVersion` (config.go:27) and in the changelog heading, both of which have
-    to move together; five GitHub releases exist (v0.1.0 … v0.3.5, tag plus notes, no binary
-    asset) with no documented procedure, and the one script that claims to do it is stale.
+    to move together; six GitHub releases exist (v0.1.0 … v0.4.0, annotated tag plus notes, no
+    binary asset) with no documented procedure, and the one script that claims to do it is stale.
   - `commits.md`, scoped to `**`: Conventional Commits, which every commit in the log
     already follows (`feat(transport): …`, `chore: …`). Recovered from `AGENTS.old.md`.
 
 ## Debt
 
-- **2026-10-13 — no tagged release since v0.3.5 (2025-12-08)** while the code has moved
-  through multi-provider support, json/v2 migration, and mcp-go v1.3.0.
 - **2026-10-21 — OAuth state is in-memory** (`oauth.NewStore(nil)`, transport.go:116):
   a restart drops registered clients and refresh tokens, so connectors need a fresh
   browser login once their access token expires, and an issued access token stays valid

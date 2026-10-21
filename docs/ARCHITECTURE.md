@@ -114,7 +114,7 @@ parameters in the tool schema at all (mcp_server.go:110).
 
 ## MCP surface
 
-Server name `gpt-websearch-mcp`, version `0.3.5` (config.go:25, config.go:27), with logging, tools,
+Server name `gpt-websearch-mcp`, version `0.4.0` (config.go:25, config.go:27), with logging, tools,
 resources, prompts, recovery, and input/output schema validation enabled (mcp_server.go:28).
 
 - **Tool `gpt_websearch`** (registered mcp_server.go:45, defined mcp_server.go:88).
