@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -392,5 +393,180 @@ func TestResolveProvider(t *testing.T) {
 				t.Errorf("resolveProvider(%q).Name = %q, want %q", tt.in, got.Name, tt.want)
 			}
 		})
+	}
+}
+
+// testPasswordHash is a format-valid PBKDF2 fixture; Validate only parses the
+// shape, it never derives the key.
+const testPasswordHash = "pbkdf2-sha256.600000.00000000000000000000000000000000." +
+	"0000000000000000000000000000000000000000000000000000000000000000"
+
+func TestLoadOAuthEnv(t *testing.T) {
+	t.Run("defaults_leave_oauth_off", func(t *testing.T) {
+		var cfg MCPConfig
+		if err := loadOAuthEnv(&cfg); err != nil {
+			t.Fatalf("loadOAuthEnv() error = %v", err)
+		}
+		if cfg.OAuthEnabled || cfg.AuthEnabled {
+			t.Fatalf("OAuthEnabled = %v, AuthEnabled = %v; want both false", cfg.OAuthEnabled, cfg.AuthEnabled)
+		}
+		if cfg.OAuthAccessTTL != defaultOAuthAccessTTL || cfg.OAuthRefreshTTL != defaultOAuthRefreshTTL {
+			t.Fatalf("TTLs = %v / %v", cfg.OAuthAccessTTL, cfg.OAuthRefreshTTL)
+		}
+	})
+
+	t.Run("enabled_forces_auth_and_reads_values", func(t *testing.T) {
+		t.Setenv("ANSWER_MCP_OAUTH", "true")
+		t.Setenv("ANSWER_MCP_ISSUER", "https://karma.test/answer")
+		t.Setenv("ANSWER_MCP_RESOURCE", "https://karma.test/answer/mcp")
+		t.Setenv("ANSWER_MCP_LOGIN_USER", "tester")
+		t.Setenv("ANSWER_MCP_LOGIN_PASSWORD_HASH", testPasswordHash)
+		t.Setenv("ANSWER_MCP_ACCESS_TTL", "30m")
+		t.Setenv("ANSWER_MCP_REFRESH_TTL", "96h")
+		var cfg MCPConfig
+		if err := loadOAuthEnv(&cfg); err != nil {
+			t.Fatalf("loadOAuthEnv() error = %v", err)
+		}
+		if !cfg.OAuthEnabled || !cfg.AuthEnabled {
+			t.Fatalf("OAuthEnabled = %v, AuthEnabled = %v; want both true", cfg.OAuthEnabled, cfg.AuthEnabled)
+		}
+		if cfg.OAuthIssuer != "https://karma.test/answer" || cfg.OAuthResource != "https://karma.test/answer/mcp" {
+			t.Fatalf("issuer/resource = %q / %q", cfg.OAuthIssuer, cfg.OAuthResource)
+		}
+		if cfg.OAuthLoginUser != "tester" || cfg.OAuthLoginPasswordHash != testPasswordHash {
+			t.Fatalf("login user/hash not read")
+		}
+		if cfg.OAuthAccessTTL != 30*time.Minute || cfg.OAuthRefreshTTL != 96*time.Hour {
+			t.Fatalf("TTLs = %v / %v", cfg.OAuthAccessTTL, cfg.OAuthRefreshTTL)
+		}
+	})
+
+	t.Run("invalid_bool_errors", func(t *testing.T) {
+		t.Setenv("ANSWER_MCP_OAUTH", "maybe")
+		var cfg MCPConfig
+		err := loadOAuthEnv(&cfg)
+		if err == nil || !strings.Contains(err.Error(), "ANSWER_MCP_OAUTH") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("invalid_duration_errors", func(t *testing.T) {
+		t.Setenv("ANSWER_MCP_ACCESS_TTL", "soon")
+		var cfg MCPConfig
+		err := loadOAuthEnv(&cfg)
+		if err == nil || !strings.Contains(err.Error(), "ANSWER_MCP_ACCESS_TTL") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+}
+
+// validOAuthConfig returns a config that passes Validate with OAuth on.
+func validOAuthConfig() MCPConfig {
+	return parseMCPConfig(MCPConfig{
+		APIKey:                 "k",
+		AuthEnabled:            true,
+		AuthSecretKey:          testSecret,
+		OAuthEnabled:           true,
+		OAuthIssuer:            "https://karma.test/answer",
+		OAuthResource:          "https://karma.test/answer/mcp",
+		OAuthLoginUser:         "tester",
+		OAuthLoginPasswordHash: testPasswordHash,
+		OAuthAccessTTL:         time.Hour,
+		OAuthRefreshTTL:        2 * time.Hour,
+	})
+}
+
+func TestMCPConfigValidate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		mutate  func(*MCPConfig)
+		wantErr string // substring; empty means Validate must pass
+	}{
+		{
+			name:   "valid_oauth_config_passes",
+			mutate: func(*MCPConfig) {},
+		},
+		{
+			name:   "disabled_passes_without_secret",
+			mutate: func(c *MCPConfig) { c.OAuthEnabled, c.AuthEnabled, c.AuthSecretKey = false, false, "" },
+		},
+		{
+			name:    "auth_requires_secret",
+			mutate:  func(c *MCPConfig) { c.OAuthEnabled, c.AuthSecretKey = false, "" },
+			wantErr: "GEMINI_AUTH_SECRET_KEY",
+		},
+		{
+			name:    "oauth_requires_long_secret",
+			mutate:  func(c *MCPConfig) { c.AuthSecretKey = "short" },
+			wantErr: "32",
+		},
+		{
+			name:    "oauth_requires_absolute_issuer",
+			mutate:  func(c *MCPConfig) { c.OAuthIssuer = "karma.test/answer" },
+			wantErr: "issuer",
+		},
+		{
+			name:    "oauth_requires_login_user",
+			mutate:  func(c *MCPConfig) { c.OAuthLoginUser = "" },
+			wantErr: "LoginUser",
+		},
+		{
+			name:    "oauth_requires_valid_hash",
+			mutate:  func(c *MCPConfig) { c.OAuthLoginPasswordHash = "nope" },
+			wantErr: "LoginPasswordHash",
+		},
+		{
+			name:    "refresh_ttl_must_exceed_access_ttl",
+			mutate:  func(c *MCPConfig) { c.OAuthRefreshTTL = c.OAuthAccessTTL },
+			wantErr: "RefreshTokenTTL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := validOAuthConfig()
+			tt.mutate(&cfg)
+			err := cfg.Validate()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() unexpected error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Validate() error = %v, want it to mention %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestParseMCPConfig_OAuthForcesAuth(t *testing.T) {
+	t.Parallel()
+
+	if got := parseMCPConfig(MCPConfig{OAuthEnabled: true}); !got.AuthEnabled {
+		t.Fatal("parseMCPConfig did not force AuthEnabled when OAuthEnabled")
+	}
+}
+
+func TestOAuthConfigDerivation(t *testing.T) {
+	t.Parallel()
+
+	cfg := validOAuthConfig()
+	derived, err := cfg.OAuthConfig()
+	if err != nil {
+		t.Fatalf("OAuthConfig() error = %v", err)
+	}
+	if derived.Issuer != cfg.OAuthIssuer || derived.Resource != cfg.OAuthResource {
+		t.Fatalf("issuer/resource = %q / %q", derived.Issuer, derived.Resource)
+	}
+	if derived.Scope != "answer" || derived.Realm != "answer-mcp" {
+		t.Fatalf("scope/realm = %q / %q, want answer / answer-mcp", derived.Scope, derived.Realm)
+	}
+	signer, ok := derived.Signer.(HS256Signer)
+	if !ok || signer.Secret != testSecret || signer.Issuer != cfg.OAuthIssuer || signer.Audience != cfg.OAuthResource {
+		t.Fatalf("signer = %+v", derived.Signer)
 	}
 }

@@ -165,13 +165,24 @@ Do this first and alone, so later breakage is unambiguous.
 
 ### Phase 6 — tests
 
-- [ ] Port `Pushover/oauth_e2e_test.go`: discovery → register → authorize → login →
+- [x] Port `Pushover/oauth_e2e_test.go`: discovery → register → authorize → login →
       token → refresh → authenticated MCP call, plus the 401-challenge assertions.
-- [ ] Guard cases in `auth_test.go`: static pair still accepted, OAuth pair accepted,
-      wrong scope 403, expired/absent `exp` rejected, body cap, OPTIONS pass-through.
-- [ ] Config cases in `config_test.go`: OAuth-requires-auth, short-secret rejection,
-      TTL defaults, env parsing.
-- [ ] Gate: `task check` green.
+      Runs against `buildHTTPHandler` (extracted from `RunHTTPTransport` in Phase 5
+      so tests drive the production wiring); `TestOAuthDiscoveryDocuments` covers
+      the karma-shaped derived well-known paths and the bare compatibility paths.
+- [x] Guard cases in `auth_test.go`: static pair still accepted, OAuth pair accepted,
+      wrong scope 403, expired/absent `exp` rejected, empty username rejected,
+      OPTIONS pass-through, challenge carries `resource_metadata`, and
+      `TestUserInfoReachesToolContext` proves identity propagation over a real
+      StreamableHTTP round trip (landed with Phase 3).
+- [x] Config cases in `config_test.go`: `loadOAuthEnv` defaults/forcing/errors,
+      `Validate()` rules table, `OAuthConfig()` derivation (scope `answer`,
+      realm `answer-mcp`, HS256Signer fields). CLI cases in `mcp_cli_test.go`:
+      token generation round-trips through the guard parse, hash format, prompts,
+      and error paths.
+- [x] Gate: `task check` green; `go test -race ./...` green. Mutation checks:
+      disabling the scope comparison fails `TestProtectMCPOAuthPair`, dropping
+      `resource_metadata` from the challenge fails the challenge assertion.
 
 ### Phase 7 — deployment artifacts and docs
 

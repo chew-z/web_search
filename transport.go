@@ -50,6 +50,29 @@ func RunStdioTransport(mcpServer *server.MCPServer) error {
 // streaming connections — important for long-running web-search requests that
 // would otherwise be silently dropped by proxies or load balancers.
 func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
+	handler, err := buildHTTPHandler(mcpServer, cfg)
+	if err != nil {
+		return err
+	}
+
+	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	Info("transport listening", "protocol", "http", "addr", addr, "endpoint", fmt.Sprintf("http://%s/", addr))
+
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  httpReadTimeout,
+		WriteTimeout: httpWriteTimeout,
+		IdleTimeout:  httpIdleTimeout,
+	}
+	return srv.ListenAndServe()
+}
+
+// buildHTTPHandler assembles the HTTP mux: the guarded MCP catch-all, the
+// unauthenticated /health and /capabilities endpoints, and — when OAuth is
+// enabled — the authorization-server routes. Split out from RunHTTPTransport
+// so tests can drive the exact production wiring through httptest.
+func buildHTTPHandler(mcpServer *server.MCPServer, cfg MCPConfig) (http.Handler, error) {
 	var mcpOpts []server.StreamableHTTPOption
 
 	if cfg.Heartbeat > 0 {
@@ -73,7 +96,7 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 	if cfg.OAuthEnabled {
 		derived, err := cfg.OAuthConfig()
 		if err != nil {
-			return fmt.Errorf("build OAuth configuration: %w", err)
+			return nil, fmt.Errorf("build OAuth configuration: %w", err)
 		}
 		oauthCfg = &derived
 	}
@@ -93,18 +116,7 @@ func RunHTTPTransport(mcpServer *server.MCPServer, cfg MCPConfig) error {
 		oauth.Mount(mux, *oauthCfg, oauth.NewStore(nil), SLogger())
 		Info("oauth mounted", "issuer", oauthCfg.Issuer, "resource", oauthCfg.Resource)
 	}
-
-	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
-	Info("transport listening", "protocol", "http", "addr", addr, "endpoint", fmt.Sprintf("http://%s/", addr))
-
-	srv := &http.Server{
-		Addr:         addr,
-		Handler:      mux,
-		ReadTimeout:  httpReadTimeout,
-		WriteTimeout: httpWriteTimeout,
-		IdleTimeout:  httpIdleTimeout,
-	}
-	return srv.ListenAndServe()
+	return mux, nil
 }
 
 // handleHealth answers liveness probes; it is deliberately unauthenticated
