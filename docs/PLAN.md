@@ -84,24 +84,25 @@ runs on karma behind nginx, and documents the whole deployment in
 
 Do this first and alone, so later breakage is unambiguous.
 
-- [ ] `go get github.com/mark3labs/mcp-go@v1.3.0`, `go mod tidy`.
-- [ ] Fix any compile fallout; Pushover proves the tool-handler signature
+- [x] `go get github.com/mark3labs/mcp-go@v1.3.0`, `go mod tidy`.
+- [x] Fix any compile fallout; Pushover proves the tool-handler signature
       `func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)`
       and the `StreamableHTTPOption` set are unchanged.
-- [ ] Skim the v1.0.0 release notes for behavior changes
+- [x] Skim the v1.0.0 release notes for behavior changes
       (session handling, validation, DNS-rebinding defaults).
-- [ ] Gate: `task check` green; smoke both transports locally
+- [x] Gate: `task check` green; smoke both transports locally
       (stdio handshake; HTTP `initialize` with a static JWT).
 
 ### Phase 2 — vendor `internal/oauth`
 
-- [ ] Copy all 14 files from `Pushover/internal/oauth/` (tests included)
+- [x] Copy all 14 files from `Pushover/internal/oauth/` (tests included)
       to `Answer/internal/oauth/`; import path `github.com/chew-z/web_search/internal/oauth`.
-- [ ] Change only the project-specific defaults:
-      package doc comment, `Scope` default `pushover` → `answer`,
-      `Realm` default `pushover-mcp` → `answer-mcp`.
-      Everything else stays byte-identical so future cross-repo ports diff cleanly.
-- [ ] Gate: `go test ./internal/oauth/...` green (brings the 429, client-secret,
+- [x] Full rename following the Alerts precedent (their copy has zero pushover
+      references): `pushover` → `answer`, `pushover-mcp` → `answer-mcp` throughout
+      including test fixtures; login page re-branded (`answer` / `web search answers`,
+      consent copy `asking to search the web as you`).
+      Defaults: `Scope` = `answer`, `Realm` = `answer-mcp`.
+- [x] Gate: `go test ./internal/oauth/...` green (brings the 429, client-secret,
       login-bound and store race tests with it).
 
 ### Phase 3 — rework `auth.go` to the guard model
