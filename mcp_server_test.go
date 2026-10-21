@@ -271,6 +271,24 @@ func TestGptWebsearch_ToolsList_SchemaShape(t *testing.T) {
 		t.Fatalf("gpt_websearch not found in tools/list output")
 	}
 
+	// Without explicit annotations mcp-go emits the MCP spec defaults, which
+	// mark the tool destructive; clients gate approval prompts on these hints.
+	annotations, ok := tool["annotations"].(map[string]any)
+	if !ok {
+		t.Fatalf("gpt_websearch annotations missing or wrong type: %v", tool["annotations"])
+	}
+	for field, want := range map[string]any{
+		"title":           "Search the Web",
+		"readOnlyHint":    true,
+		"destructiveHint": false,
+		"idempotentHint":  true,
+		"openWorldHint":   true,
+	} {
+		if got := annotations[field]; got != want {
+			t.Errorf("annotations.%s: got %v, want %v", field, got, want)
+		}
+	}
+
 	in, ok := tool["inputSchema"].(map[string]any)
 	if !ok {
 		t.Fatalf("gpt_websearch inputSchema missing or wrong type")

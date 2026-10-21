@@ -123,6 +123,9 @@ resources, prompts, recovery, and input/output schema validation enabled (mcp_se
   `web_search` (bool, default true), and — OpenAI only — `previous_response_id` and
   `prompt_cache_key`.
   The output schema is derived from `WebSearchResult` (api.go:301).
+  Annotations are set explicitly (mcp_server.go:126-130) — read-only, non-destructive,
+  idempotent, open-world — because mcp-go otherwise emits the MCP spec defaults, which
+  advertise the tool as destructive and make clients gate it behind approval prompts.
 - **Resources**: `server://info` (mcp_server.go:48) and `models://list` (mcp_server.go:59).
 - **Prompt `web_search`** (mcp_server.go:70): one required argument, `user_question`,
   returning the provider's guidance prompt wrapped around that question (mcp_server.go:292).

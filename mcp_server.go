@@ -123,6 +123,11 @@ func newGptWebsearchTool(prov provider) mcp.Tool {
 			mcp.DefaultBool(true),
 			mcp.Description("Use web search (default: true)"),
 		),
+		mcp.WithTitleAnnotation("Search the Web"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(true),
 		mcp.WithSchemaAdditionalProperties(false),
 		mcp.WithOutputSchema[WebSearchResult](),
 	)

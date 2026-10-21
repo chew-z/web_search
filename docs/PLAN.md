@@ -253,10 +253,15 @@ was true when they were done.
       bare username (`actorFrom`), which is also the prompt-cache shard key. This
       resolves the OPEN_ITEMS defect "`Claims.Role` is populated but unreachable".
 - [x] Staged unit updated (`tmp/answer.service`, new secret).
-- [ ] On karma: install the updated unit **before** restarting on this commit — the old
-      unit sets a variable the binary no longer reads, so startup fails validation.
-      Then re-run the verification curls and one static-token round trip
-      (`mcp -generate-token` with the new secret).
+- [x] On karma: unit installed **before** the restart (the old unit sets a variable the
+      binary no longer reads, so startup would fail validation), then `git pull`,
+      `task deps`, `task build`, restart. Re-verified live at `4b0dd95`: 401 challenge with
+      `resource_metadata`, both discovery documents, `/health`, `/capabilities`, and a
+      static-token round trip on the new pair (initialize 200, `notifications/initialized`
+      202, `tools/list` 200, session DELETE 200); a `gemini-mcp`-pair token is refused 401.
+- [ ] Follow-up found during that verification: `tools/list` advertised the read-only tool as
+      `destructiveHint: true` (mcp-go's spec default, nothing set annotations). Fixed in
+      mcp_server.go:126-130 after `4b0dd95` — needs one more rebuild-and-restart.
 
 ## Risks and notes
 

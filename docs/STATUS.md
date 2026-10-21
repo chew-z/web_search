@@ -36,32 +36,41 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   `api_test.go`, `auth_test.go`, `config_test.go`, `deepseek_probe_test.go`,
   `logging_test.go`, `main_test.go`, `mcp_cli_test.go`, `mcp_server_test.go`,
   `models_test.go`, `oauth_e2e_test.go`, plus the vendored suite under `internal/oauth/`.
-- Production runs commit `7bc8225` since 2026-10-21, with OAuth on: the `answer.service`
+- Production runs commit `4b0dd95` since 2026-10-21, with OAuth on: the `answer.service`
   systemd unit executes `bin/answer mcp -port 8086 -transport http` from the repo checkout
   at `/home/debian/Go/src/Answer`, behind nginx at `karma.rrj.pl/answer/mcp` with the
   three blocks from `deploy/nginx-answer.conf` (the shared GET-denying alternation no
   longer includes `answer`). `ANSWER_MCP_OAUTH=true` also switched the JWT guard on —
   before this deploy the endpoint carried a secret but ran unauthenticated.
-  Verified live on 2026-10-21: 401 challenge with `resource_metadata`, both discovery
-  documents, `/health`, `/capabilities`, the full register → login → token → MCP →
-  refresh flow, static-JWT interoperability (on the `gemini-mcp` pair that commit still
-  used), and bogus-token rejection. Provider and keys come from the unit's `Environment=`
-  block, not from `.env` (see the precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)).
+  Verified live on 2026-10-21 at `7bc8225`: the full register → login → token → MCP →
+  refresh flow, both discovery documents, `/health`, `/capabilities`, and bogus-token
+  rejection; re-verified at `4b0dd95` after the GeminiMCP decouple: 401 challenge with
+  `resource_metadata`, both discovery documents, `/health`, `/capabilities` (`oauth: true`),
+  and a static-token round trip on the new `answer-mcp` pair — initialize 200,
+  `notifications/initialized` 202, `tools/list` 200, session DELETE 200 — while a token on
+  the old `gemini-mcp` pair is now refused with 401.
+  Provider and keys come from the unit's `Environment=` block, not from `.env` (see the
+  precedence note in [ARCHITECTURE.md](ARCHITECTURE.md)).
   Deployment is manual: push, then on the VPS `git pull`, `task deps`,
   `task build`, restart the unit; nothing in this repository automates it.
+  A unit-file change goes up _before_ the restart, or startup fails validation on a
+  variable the new binary no longer reads.
   Outstanding: the claude.ai connector login itself (browser, owner's account).
-- **The GeminiMCP decouple below is committed but not on the box.** Production still runs
-  `7bc8225` with `GEMINI_AUTH_SECRET_KEY` and the `gemini-mcp` static pair.
-  Install the updated unit (`tmp/answer.service`: rotated secret,
-  `ANSWER_AUTH_SECRET_KEY`) _before_ restarting on the new commit — the old unit sets a
-  variable the new binary never reads, so startup fails validation.
-  After the restart every previously issued token is dead (the secret and the static pair
-  both changed): regenerate static tokens with `mcp -generate-token` and have connectors
-  log in again.
 - Releases: the last tagged release is v0.3.5 (2025-12-08, per `CHANGELOG.md`), and the
   version string in code is still `0.3.5` (config.go:27). No release since.
 
 ## Recent changes
+
+### 2026-10-21 — tool annotations set explicitly
+
+- `gpt_websearch` now carries `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  and `openWorldHint` (mcp_server.go:126-130), matching PolCritique. Without them mcp-go
+  emits the MCP spec defaults, so the live `tools/list` had been advertising a read-only web
+  search as `readOnlyHint: false, destructiveHint: true` — which makes clients gate it behind
+  approval prompts. Spotted in the production `tools/list` response during the decouple
+  verification. Asserted in `TestGptWebsearch_ToolsList_SchemaShape`.
+- Committed after `4b0dd95`, so it needs one more rebuild-and-restart on karma; no unit or
+  nginx change.
 
 ### 2026-10-21 — decoupled from GeminiMCP
 
