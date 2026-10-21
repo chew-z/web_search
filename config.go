@@ -265,6 +265,12 @@ func loadOAuthEnv(cfg *MCPConfig) error {
 		return err
 	}
 	cfg.OAuthEnabled = enabled
+	if enabled {
+		// OAuth access tokens are validated by the same guard as static
+		// JWTs; runMCPMode reads this env after parseMCPConfig, so the
+		// implication is enforced here where OAuthEnabled is discovered.
+		cfg.AuthEnabled = true
+	}
 	cfg.OAuthIssuer = os.Getenv("ANSWER_MCP_ISSUER")
 	cfg.OAuthResource = os.Getenv("ANSWER_MCP_RESOURCE")
 	cfg.OAuthLoginUser = os.Getenv("ANSWER_MCP_LOGIN_USER")

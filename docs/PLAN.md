@@ -146,15 +146,22 @@ Do this first and alone, so later breakage is unambiguous.
 
 ### Phase 5 — transport wiring
 
-- [ ] `RunHTTPTransport` (`transport.go`): build the guard when `AuthEnabled`,
+- [x] `RunHTTPTransport` (`transport.go`): build the guard when `AuthEnabled`,
       wrap the MCP handler, and `oauth.Mount(mux, cfg, oauth.NewStore(nil), SLogger())`
       when OAuth is enabled.
-- [ ] Keep the `/` catch-all for MCP (mcp-go routes by method, not path);
+- [x] Keep the `/` catch-all for MCP (mcp-go routes by method, not path);
       Go's ServeMux gives the exact OAuth routes precedence.
-- [ ] Add `/health` (GET, JSON status) mirroring Pushover's `handleHealth`.
-- [ ] Add `/capabilities` (GET, JSON: name, version, description, transport, tools,
+- [x] Add `/health` (GET, JSON status) mirroring Pushover's `handleHealth`.
+- [x] Add `/capabilities` (GET, JSON: name, version, description, transport, tools,
       authentication) mirroring Pushover's `handleCapabilities` + `capabilityTools`;
       the deterministic tool listing uses mcp-go v1 `ListTools()`, available after Phase 1.
+- [x] Smoked live: metadata documents, `/health`, `/capabilities` (lists `gpt_websearch`),
+      `/register` → 201, and `POST /` without a token → 401 with
+      `resource_metadata` in the challenge. The smoke caught an ordering bug —
+      `parseMCPConfig` forced `AuthEnabled` before `loadOAuthEnv` read
+      `ANSWER_MCP_OAUTH`, leaving the guard nil; the implication is now enforced
+      in `loadOAuthEnv` (config.go). JSON helper named `respondJSON` because
+      `writeJSON` is taken by an api_test.go helper.
 
 ### Phase 6 — tests
 

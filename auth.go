@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	json "encoding/json/v2"
 	"fmt"
 	"net/http"
 	"strings"
@@ -208,14 +207,7 @@ func (g *authGuard) writeChallenge(w http.ResponseWriter, code string) {
 
 // writeAuthError writes a JSON authentication error with the supplied HTTP status.
 func writeAuthError(w http.ResponseWriter, status int, code string) {
-	body, err := json.Marshal(map[string]string{"error": code})
-	if err != nil {
-		http.Error(w, "", status)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write(body)
+	respondJSON(w, status, map[string]string{"error": code})
 }
 
 // getUserInfo extracts user identity fields from the request context.
