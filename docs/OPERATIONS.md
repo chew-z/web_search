@@ -52,20 +52,46 @@ produces a `web_search` binary (see the naming gotcha in
 
 ## VPS environment and systemd
 
-Production runs `answer.service` on karma, executing
-`bin/answer mcp -port 8086 -transport http` with the provider set in the unit's
-`Environment=` block; deployment is a manual build-and-copy.
-The unit on the box is the source of truth for paths; the OAuth additions to
-its `Environment=` block are:
+Production runs `answer.service` on karma from `/home/debian/Go/src/Answer`,
+executing `bin/answer mcp -port 8086 -transport http` with the provider and
+keys in the unit's `Environment=` block; deployment is a manual build-and-copy.
+The OAuth port needs no new flag — `ANSWER_MCP_OAUTH=true` switches the HTTP
+guard on by itself (`config.go:262-283`), which also closes the pre-OAuth
+state where the unit carried a secret but ran without `-auth-enabled`.
+The unit shape, with placeholders for every credential:
 
 ```ini
-Environment=ANSWER_MCP_OAUTH=true
-Environment=ANSWER_MCP_ISSUER=https://karma.rrj.pl/answer
-Environment=ANSWER_MCP_RESOURCE=https://karma.rrj.pl/answer/mcp
-Environment=ANSWER_MCP_LOGIN_USER=<oauth-login-user>
-Environment=ANSWER_MCP_LOGIN_PASSWORD_HASH=<generated-password-hash>
-Environment=GEMINI_AUTH_SECRET_KEY=<at-least-32-random-bytes>
+[Unit]
+Description=Answer MCP server with http streamable transport
+After=network.target
+
+[Service]
+User=debian
+Group=adm
+WorkingDirectory=/home/debian/Go/src/Answer
+ExecStart=/home/debian/Go/src/Answer/bin/answer mcp -port 8086 -transport http
+Restart=always
+RestartSec=15
+StandardOutput=append:/var/log/Answer.log
+StandardError=append:/var/log/Answer.log
+Environment="PROVIDER=openai"
+Environment="OPENAI_API_KEY=<openai-key>"
+Environment="GEMINI_AUTH_SECRET_KEY=<at-least-32-random-bytes>"
+Environment="ANSWER_MCP_OAUTH=true"
+Environment="ANSWER_MCP_ISSUER=https://karma.rrj.pl/answer"
+Environment="ANSWER_MCP_RESOURCE=https://karma.rrj.pl/answer/mcp"
+Environment="ANSWER_MCP_LOGIN_USER=<oauth-login-user>"
+Environment="ANSWER_MCP_LOGIN_PASSWORD_HASH=<generated-password-hash>"
+
+[Install]
+WantedBy=multi-user.target
 ```
+
+Quote every `Environment=` value: the current signing secret contains `?`, `&`,
+and `+`, and an unquoted or unterminated value is silently dropped or mangled.
+Keep the existing `GEMINI_AUTH_SECRET_KEY` — it is exactly 32 bytes, which
+passes the OAuth minimum, and GeminiMCP mints interoperable tokens with it;
+rotating it would break every cross-service token at once.
 
 Generate the login hash interactively, then place stdout in
 `ANSWER_MCP_LOGIN_PASSWORD_HASH`:
@@ -107,9 +133,10 @@ For the production issuer and resource, the required paths are:
 
 Install the three blocks in
 [deploy/nginx-answer.conf](../deploy/nginx-answer.conf) inside karma's TLS
-server block, and in the same edit remove `answer` from the shared
-`location ~ ^/(?:answer|gemini|time)/(.*)$` alternation and from
-`map $uri $mcp_backend` if it is listed there.
+server block (next to the alerts and pushover blocks), and in the same edit
+remove `answer` from the shared `location ~ ^/(?:answer|gemini|time)/(.*)$`
+alternation — leaving `^/(?:gemini|time)/(.*)$` — and delete the `~^/answer/`
+line from `map $uri $mcp_backend`.
 That shared location denies GET, but OAuth browser authorization requires
 `GET /authorize`, and the alternation forwards the unstripped URI, which the
 in-process OAuth routes would never match.
