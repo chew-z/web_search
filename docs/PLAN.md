@@ -107,18 +107,21 @@ Do this first and alone, so later breakage is unambiguous.
 
 ### Phase 3 — rework `auth.go` to the guard model
 
-- [ ] Add `SignToken`, `GenerateStaticToken`, and `HS256Signer` (implements `oauth.Signer`),
+- [x] Add `SignToken`, `GenerateStaticToken`, and `HS256Signer` (implements `oauth.Signer`),
       with `staticIssuer = "gemini-mcp"`, `staticAudience = "gemini-mcp-user"`.
-- [ ] Merge the claims structs: `UserID`, `Username`, `Role` (legacy static tokens)
+- [x] Merge the claims structs: `UserID`, `Username`, `Role` (legacy static tokens)
       plus `Scope` (OAuth tokens) over `jwt.RegisteredClaims`;
       `getUserInfo` (consumed at `api.go:216`) keeps working.
-- [ ] Replace `newAuthHTTPMiddleware` with `authGuard.protectMCP`:
+- [x] Replace `newAuthHTTPMiddleware` with `authGuard.protectMCP`:
       token-pair matching, `writeChallenge` with `resource_metadata` (RFC 9728 discovery),
       4 MiB `http.MaxBytesReader`, OPTIONS pass-through, 403 on `insufficient_scope`.
-- [ ] Adopt Pushover's `copyActor` + `server.WithHTTPContextFunc` so the
-      authenticated actor reaches tool handlers over HTTP and stdio alike.
-- [ ] Note the behavior changes: `exp` required; 401 body becomes `{"error":"unauthorized"}`
-      with the detail moving into the `WWW-Authenticate` error code.
+- [x] `copyActor` + `server.WithHTTPContextFunc` turned out to be unnecessary:
+      mcp-go v1.3.0 derives the tool context from the request context
+      (streamable_http.go:720), so the guard's `userInfo` value flows through as-is.
+      Proven by `TestUserInfoReachesToolContext` (real StreamableHTTP round trip).
+      OAuth tokens carry no `user_id`, so the username doubles as the cache-shard key.
+- [x] Behavior changes accepted: `exp` required; 401 body becomes `{"error":"unauthorized"}`
+      with the detail moving into the `WWW-Authenticate` error code; empty username rejected.
 
 ### Phase 4 — config, env, and CLI helpers
 

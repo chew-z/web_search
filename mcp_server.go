@@ -130,10 +130,10 @@ func newGptWebsearchTool(prov provider) mcp.Tool {
 }
 
 // webSearchHandler returns a handler for the web search tool.
-// Authentication is enforced at the HTTP transport layer (newAuthHTTPMiddleware)
+// Authentication is enforced at the HTTP transport layer (authGuard.protectMCP)
 // before this handler is ever reached; no auth logic is needed here.
 // User identity is logged opportunistically when present in the context
-// (set by the middleware on authenticated HTTP requests).
+// (set by the guard on authenticated HTTP requests).
 func webSearchHandler(apiKey, baseURL string, prov provider) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
