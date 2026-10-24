@@ -25,6 +25,8 @@ func initLogger(verbose bool) {
 		}
 		handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: &levelVar})
 		logger = slog.New(handler)
+		// The shared oauth package logs through slog.Default().
+		slog.SetDefault(logger)
 	})
 }
 

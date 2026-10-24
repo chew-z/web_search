@@ -1,10 +1,14 @@
 package oauth
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -214,5 +218,26 @@ func TestMountDiscoveryDocuments(t *testing.T) {
 				t.Fatalf("POST response = %d Allow=%q", post.Code, post.Header().Get("Allow"))
 			}
 		})
+	}
+}
+
+// failingWriter is a ResponseWriter whose body writes fail, like a client that hung up.
+type failingWriter struct{ header http.Header }
+
+func (f *failingWriter) Header() http.Header       { return f.header }
+func (f *failingWriter) WriteHeader(int)           {}
+func (f *failingWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+
+func TestEncodeJSONLogsWriteFailure(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	encodeJSON(&failingWriter{header: http.Header{}}, map[string]string{"k": "v"})
+
+	out := buf.String()
+	if strings.Count(out, "level=WARN") != 1 || !strings.Contains(out, "broken pipe") {
+		t.Fatalf("want one WARN record carrying the write error, got %q", out)
 	}
 }

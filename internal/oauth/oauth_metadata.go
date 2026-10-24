@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -169,10 +170,10 @@ func metadataHandler(build func() any) http.HandlerFunc {
 	}
 }
 
-// encodeJSON writes a JSON body. An encode failure means the connection is
-// already broken — the header is written and there is nothing useful left to
-// say — so it is swallowed deliberately rather than by omission.
+// encodeJSON writes a JSON body. The status line is already sent, so an encode
+// failure (usually a client that hung up) cannot become an HTTP error; log it.
 func encodeJSON(w http.ResponseWriter, value any) {
-	// The status line is already sent; there is nothing left to report.
-	_ = json.NewEncoder(w).Encode(value)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		slog.Default().Warn("oauth: encoding JSON response", "error", err)
+	}
 }
