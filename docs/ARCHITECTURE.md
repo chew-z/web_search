@@ -106,6 +106,34 @@ asked for the current Go release, `gpt-6-luna` answered 1.27.2 with a go.dev cit
 while `deepseek-flash` twice answered 1.26.3 "as of May 2026" — months stale.
 Prefer the `openai` provider for version and freshness lookups.
 
+### DeepSeek API surface
+
+DeepSeek's release notes (`https://api-docs.deepseek.com/updates.md`) define `deepseek-flash`
+as a rolling alias: as of the 2026-10-17 update it resolves to DeepSeek-V4.1-Flash-1017,
+whose release left the API shape and pricing unchanged.
+The alias moves without a code change here, which is why the model registry ships the name
+rather than a snapshot.
+
+`deepseek-flash` also accepts images through the Responses API
+(`https://api-docs.deepseek.com/guides/vision.md`): `input_image` content parts carrying an
+`image_url` or `file_id`, with an optional `detail` of `low`, `high`, `original`, or `auto`,
+in JPEG, PNG, GIF, or WebP.
+Images are allowed only in user and developer messages and in certain tool outputs — system and
+assistant messages with images are rejected with HTTP 400.
+This project's tool takes a text `query` only, so vision input is unused and unimplemented.
+
+Since 2026-10-17 DeepSeek also offers a standalone Search API,
+`POST https://api.deepseek.com/v1/tools/search` (`https://api-docs.deepseek.com/api/search.md`):
+it takes a `query` of 1–128 Unicode characters (with `site:`/`-site:`/quoted-phrase operators)
+and returns up to 50 ranked results carrying `title`, `url`, `snippet`, `summary`, optional page
+`content`, `rerank_score` (0–3), and `authority` (−1 to 4).
+Its companion Fetch API, `POST https://api.deepseek.com/v1/tools/fetch`
+(`https://api-docs.deepseek.com/api/fetch.md`), takes one HTTP(S) `url` and returns the page
+`title` and `content` rendered as Markdown.
+This project does not use either — search runs server-side through the Responses API's
+`web_search` tool, and the Search endpoint returns raw results rather than a synthesized answer.
+Adopting them would be a separate change, not yet planned.
+
 `SupportsContinuity` gates three things: computing a prompt cache key (main.go:273,
 api.go:252), dropping `previous_response_id` (api.go:255), and advertising those two
 parameters in the tool schema at all (mcp_server.go:110).

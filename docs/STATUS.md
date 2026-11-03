@@ -29,9 +29,9 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
 
 ## Health
 
-- `task check` — green on 2026-10-21: `fmt:check`, `vet`, `lint:ci` (0 issues), `test:short`;
-  `go test -race ./...` green the same day.
-- `task lint:md` — green on 2026-10-21.
+- `task check` — green on 2026-11-03: `fmt:check`, `vet`, `lint:ci` (0 issues), `test:short`;
+  `go test -race ./...` green on 2026-10-21.
+- `task lint:md` — green on 2026-11-03.
 - Tests live beside the code as `*_test.go` and run without network access:
   `api_test.go`, `auth_test.go`, `config_test.go`, `deepseek_probe_test.go`,
   `logging_test.go`, `main_test.go`, `mcp_cli_test.go`, `mcp_server_test.go`,
@@ -67,6 +67,16 @@ That is why the module moved from 1.26.0 to 1.27.0 on 2026-10-13, and why
   production `/capabilities` still reports `0.3.5` until the next rebuild-and-restart.
 
 ## Recent changes
+
+### 2026-11-03 — DeepSeek API documentation refresh
+
+- Read DeepSeek's release notes and its Search, Fetch, and vision documentation and recorded
+  the durable facts in [ARCHITECTURE.md](ARCHITECTURE.md): `deepseek-flash` is a rolling alias
+  now resolving to DeepSeek-V4.1-Flash-1017 (2026-10-17), with API shape and pricing unchanged.
+- The standalone Search and Fetch APIs (`POST https://api.deepseek.com/v1/tools/search`,
+  `POST https://api.deepseek.com/v1/tools/fetch`, opened 2026-10-17) are documented as
+  available but not adopted — this project keeps using the Responses API's server-side
+  `web_search` tool. No code changed.
 
 ### 2026-10-21 — v0.4.0 released
 

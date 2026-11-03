@@ -74,7 +74,7 @@ beats the one in `.env`.
 | ---------- | ------------------ | ---------------- | ------------------------------------------------------------------------- |
 | `openai`   | `OPENAI_API_KEY`   | `gpt-6-luna`     | Default. Supports conversation continuity (`previous_response_id`).        |
 <!-- markdownlint-disable-next-line MD013 -->
-| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-flash` | Stateless: `previous_response_id`/`prompt_cache_key` are not sent. Web search runs server-side. `deepseek-flash` is DeepSeek's rolling alias — it resolves to DeepSeek-V4.1-Flash today. |
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek-flash` | Stateless: `previous_response_id`/`prompt_cache_key` are not sent. Web search runs server-side. `deepseek-flash` is DeepSeek's rolling alias — it resolves to DeepSeek-V4.1-Flash-1017 at the time of writing. |
 
 The base URL, web-search tool type, model defaults, and the MCP guidance
 prompt all adapt to the selected provider; `-base` still overrides the
@@ -100,7 +100,7 @@ QUESTION=                # Optional: default question
 
 DeepSeek provider currently offers a single model, `deepseek-flash` — the
 version-less alias that DeepSeek repoints at each new flash release
-(DeepSeek-V4.1-Flash at the time of writing); tune `EFFORT` instead of the model.
+(DeepSeek-V4.1-Flash-1017 at the time of writing); tune `EFFORT` instead of the model.
 
 **Effort-Based Timeouts**: `none` = 90 seconds, `low` = 3 minutes, `medium` = 5 minutes, `high` = 10 minutes, `xhigh` = 15 minutes.
 Tip: Use `low` for quicker answers when speed matters.
